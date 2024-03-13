@@ -1,7 +1,7 @@
 from src.core.config.database import Base
 from sqlalchemy import Column, String, Integer, Date, UUID
 
-
+#Modelo de la tabla information_admin
 class DataAdminModel(Base):
     __tablename__ = "data_admin"
 
@@ -12,4 +12,5 @@ class DataAdminModel(Base):
         return {
             "id_data_admin": self.id_data_admin,
             "data_title": self.data_title,
+
         }
