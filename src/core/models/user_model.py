@@ -11,7 +11,8 @@ class UserModel(Base):
     last_name = Column(String, nullable=False)
     birth_date = Column(Date, nullable=False)
     email = Column(String, nullable=False, unique=True)
-    password = Column(String, nullable=False)
+    salt = Column(Integer, nullable=False)
+    hash_pass = Column(String, nullable=False)
 
     def model_to_dict(self):
         return {
@@ -21,5 +22,5 @@ class UserModel(Base):
             "last_name": self.last_name,
             "birth_date": self.birth_date,
             "email": self.email,
-            "password": self.password,
+            "password": self.hash_pass,
         }
