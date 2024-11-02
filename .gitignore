@@ -5,3 +5,6 @@ poetry.lock
 
 # Environment
 .env
+
+# VSCode
+.vscode/
