@@ -8,8 +8,10 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-fastapi = "^0.115.4"
-uvicorn = {extras = ["standard"], version = "^0.32.0"}
+python-decouple = "^3.8"
+asyncpg = "^0.30.0"
+fastapi = {extras = ["all"], version = "^0.115.6"}
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
 
 
 [build-system]
