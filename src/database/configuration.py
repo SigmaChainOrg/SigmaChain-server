@@ -1,8 +1,11 @@
 from typing import AsyncGenerator
-from decouple import config
-from decouple import UndefinedValueError
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from decouple import UndefinedValueError, config
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
+
+# Ensure all models are imported
+import src.database.models  # noqa
 
 try:
     user = config("DB_USER")

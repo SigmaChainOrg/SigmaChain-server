@@ -35,7 +35,14 @@ class UserInfo(Base):
     )
     first_name = Column(String(255), nullable=False)
     last_name = Column(String(255), nullable=False)
-    id_type = Column(Enum(IdTypeEnum), nullable=False)
+    id_type = Column(
+        Enum(
+            IdTypeEnum,
+            name="id_type_enum",
+            schema="access_control",
+        ),
+        nullable=False,
+    )
     id_number = Column(String(50), nullable=False)
     birth_date = Column(DateTime, nullable=False)
     updated_at = Column(
