@@ -21,8 +21,8 @@ class UserGroups(Base):
         nullable=False,
     )
 
-    user = relationship("User", back_populates="groups")
-    group = relationship("Group", back_populates="users")
+    user = relationship("User", back_populates="groups", uselist=False)
+    group = relationship("Group", back_populates="users", uselist=False)
 
 
 class Group(Base):
