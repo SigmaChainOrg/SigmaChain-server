@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Column, String, Enum, UUID, Boolean, DateTime, ForeignKey
+from sqlalchemy import UUID, Boolean, Column, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -20,6 +20,8 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
 
     user_info = relationship("UserInfo", back_populates="user", uselist=False)
+    roles = relationship("UserRoles", back_populates="user")
+    groups = relationship("UserGroups", back_populates="user")
 
 
 class UserInfo(Base):
@@ -52,4 +54,4 @@ class UserInfo(Base):
         nullable=False,
     )
 
-    user = relationship("User", back_populates="user_info")
+    user = relationship("User", back_populates="user_info", uselist=False)
