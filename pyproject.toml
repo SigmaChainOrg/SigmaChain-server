@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "sigmachain-sever"
+version = "0.1.0"
+description = "The core of SigmaChain: robust server and API to manage requests and approval workflows in a secure and scalable architecture."
+authors = ["SigmaChainOrg"]
+license = "Apache License Version 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+python-decouple = "^3.8"
+asyncpg = "^0.30.0"
+fastapi = {extras = ["all"], version = "^0.115.6"}
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+alembic = "^1.14.1"
+psycopg2-binary = "^2.9.10"
+argon2-cffi = "^23.1.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

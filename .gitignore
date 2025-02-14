@@ -1,6 +1,10 @@
 # Python
 venv/
 __pycache__/
+poetry.lock
 
 # Environment
 .env
+
+# VSCode
+.vscode/

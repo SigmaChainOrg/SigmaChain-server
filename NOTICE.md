@@ -6,7 +6,7 @@ This project is made possible through the hard work and dedication of our team. 
 
 ## Project Manager
 
-- **Alberto Soriano Eusebio** - [@Soriano212](https://github.com/Soriano212)
+- **Alberto Soriano Eusebio** - [@AlbertSorianoDev](https://github.com/AlbertSorianoDev)
   - Roles: Project Manager, Back-End Team Lead and Developer
   - Period of Contribution: February 2024 - Present
   - Areas of responsibility: Leading project management efforts, acting as the primary guide for the back-end development team, and directly contributing to server-side logic, database management, and API development to ensure high-quality application performance and reliability.
