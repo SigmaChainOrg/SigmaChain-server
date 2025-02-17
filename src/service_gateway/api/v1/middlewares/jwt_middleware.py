@@ -1,12 +1,10 @@
 from uuid import UUID
 
-from starlette.authentication import (
-    AuthCredentials,
-    AuthenticationBackend,
-    AuthenticationError,
-)
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.service_gateway.security.authentication import decode_access_token
+from src.utils.http_exceptions import AuthenticationError
 
 API_ROOT = "/api/v1"
 PUBLIC_ROUTES = ["", "/docs", "/redoc", "/openapi.json", "/auth/signin", "/auth/signup"]
@@ -14,16 +12,16 @@ PUBLIC_ROUTES = ["", "/docs", "/redoc", "/openapi.json", "/auth/signin", "/auth/
 api_public_routes = [f"{API_ROOT}{route}" for route in PUBLIC_ROUTES]
 
 
-class JWTAuthBackend(AuthenticationBackend):
-    async def authenticate(self, conn):
-        if conn.url.path in api_public_routes:
-            return None
+class JWTMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in api_public_routes:
+            return await call_next(request)
 
-        auth_header = conn.headers.get("Authorization")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            raise AuthenticationError("Missing or invalid Authorization header")
+        authorization: str = str(request.headers.get("Authorization"))
+        if not authorization or not authorization.startswith("Bearer "):
+            raise AuthenticationError("Token missing or invalid")
 
-        token = auth_header.split(" ")[1]
+        token = authorization.split(" ")[1]
 
         decode_result = decode_access_token(token)
 
@@ -32,4 +30,9 @@ class JWTAuthBackend(AuthenticationBackend):
 
         payload = decode_result.data
 
-        return AuthCredentials(["authenticated"]), UUID(payload["sub"])
+        try:
+            setattr(request.state, "user_id", UUID(payload["sub"]))
+        except ValueError:
+            raise AuthenticationError("Invalid token.")
+
+        return await call_next(request)
