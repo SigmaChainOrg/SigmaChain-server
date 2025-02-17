@@ -1,6 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -10,6 +11,7 @@ from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserSignUpSchema,
 )
 from src.service_gateway.security.authentication import hash_password, verify_password
+from src.utils.http_exceptions import DatabaseIntegrityError, EmailAlreadyExistsError
 from src.utils.function_responses import ResponseData
 
 
@@ -41,7 +43,15 @@ class UserService:
         )
         self.db.add(new_user)
 
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except IntegrityError as e:
+            await self.db.rollback()
+
+            if "user_email" in str(e):
+                raise EmailAlreadyExistsError()
+
+            raise DatabaseIntegrityError()
 
     async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserSchema]:
         result = await self.db.execute(
