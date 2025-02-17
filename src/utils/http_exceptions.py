@@ -17,3 +17,16 @@ class DatabaseIntegrityError(HTTPException):
         super().__init__(status_code=500, detail=message)
 
     pass
+
+
+class AuthenticationError(HTTPException):
+    """Exception when an authentication error occurs."""
+
+    def __init__(self, message: str = "Authentication error.") -> None:
+        super().__init__(
+            status_code=401,
+            detail=message,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    pass

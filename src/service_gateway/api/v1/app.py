@@ -1,13 +1,10 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.authentication import AuthenticationMiddleware
 
 from src.service_gateway.api.v1.middlewares.exception_handler import (
     custom_exception_handler,
 )
-from src.service_gateway.api.v1.middlewares.jwt_middleware import (
-    JWTAuthBackend,
-)
+from src.service_gateway.api.v1.middlewares.jwt_middleware import JWTMiddleware
 from src.service_gateway.api.v1.routers.main_router import api_v1_router
 from src.service_gateway.api.v1.schemas.general.general_schemas import ResponseSchema
 
@@ -17,7 +14,7 @@ api_v1.version = "0.0.2"
 
 
 # Adding Middlewares
-api_v1.add_middleware(AuthenticationMiddleware, backend=JWTAuthBackend())
+api_v1.add_middleware(JWTMiddleware)
 
 # Adding Exception Handlers
 api_v1.add_exception_handler(Exception, custom_exception_handler)
