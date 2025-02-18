@@ -7,7 +7,14 @@ from src.service_gateway.security.authentication import decode_access_token
 from src.utils.http_exceptions import AuthenticationError
 
 API_ROOT = "/api/v1"
-PUBLIC_ROUTES = ["", "/docs", "/redoc", "/openapi.json", "/auth/signin", "/auth/signup"]
+PUBLIC_ROUTES = [
+    "/",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+    "/auth/signin",
+    "/auth/signup",
+]
 
 api_public_routes = [f"{API_ROOT}{route}" for route in PUBLIC_ROUTES]
 
