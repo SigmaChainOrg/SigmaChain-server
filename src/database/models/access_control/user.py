@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict
 
 from sqlalchemy import UUID, Boolean, DateTime, Enum, ForeignKey, String
@@ -33,7 +34,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
         nullable=False,
@@ -92,8 +93,8 @@ class UserInfo(Base):
         nullable=False,
     )
     id_number: Mapped[str] = mapped_column(String(50), nullable=False)
-    birth_date: Mapped[DateTime] = mapped_column(DateTime, nullable=False)
-    updated_at: Mapped[DateTime] = mapped_column(
+    birth_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
         onupdate=func.now(),

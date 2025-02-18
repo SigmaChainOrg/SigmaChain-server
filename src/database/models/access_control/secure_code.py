@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import UUID, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,7 +25,7 @@ class SecureCode(Base):
         String(6),
         nullable=False,
     )
-    expires_at: Mapped[DateTime] = mapped_column(
+    expires_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
     )
