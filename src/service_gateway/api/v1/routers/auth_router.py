@@ -18,6 +18,11 @@ from src.service_gateway.security.authentication import (
     validate_password,
     validate_password_match,
 )
+from src.utils.http_exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+)
 
 security = HTTPBearer()
 
@@ -40,20 +45,14 @@ async def signup(user_signup: UserSignUpSchema, db: AsyncSession = Depends(get_d
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
-        return JSONResponse(
-            content=ResponseSchema[None](msg=pw_validity.msg).model_dump(),
-            status_code=400,
-        )
+        raise BadRequestError(pw_validity.msg)
 
     pw_validity = validate_password_match(
         user_signup.password.get_secret_value(),
         user_signup.confirm_password.get_secret_value(),
     )
     if not pw_validity.ok:
-        return JSONResponse(
-            content=ResponseSchema[None](msg=pw_validity.msg).model_dump(),
-            status_code=400,
-        )
+        raise BadRequestError(pw_validity.msg)
 
     user_service = UserService(db)
 
@@ -82,26 +81,12 @@ async def signin(
     )
 
     if not verified_response.ok:
-        return JSONResponse(
-            content=ResponseSchema[None](
-                msg="Invalid email or password",
-                ok=False,
-            ).model_dump(),
-            headers={"WWW-Authenticate": "Bearer"},
-            status_code=401,
-        )
+        raise AuthenticationError("Invalid email or password")
 
     user_schema = verified_response.data
 
     if user_schema is None:
-        return JSONResponse(
-            content=ResponseSchema[None](
-                msg="Invalid email or password",
-                ok=False,
-            ).model_dump(),
-            headers={"WWW-Authenticate": "Bearer"},
-            status_code=404,
-        )
+        raise NotFoundError("User not found")
 
     token = create_access_token(
         data={
