@@ -61,6 +61,7 @@ async def signup(user_signup: UserSignUpSchema, db: AsyncSession = Depends(get_d
     return JSONResponse(
         content=ResponseSchema[None](
             msg="User signed up successfully",
+            data=None,
             ok=True,
         ).model_dump(),
     )
@@ -114,6 +115,9 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
 
     user_id: UUID = request.state.user_id
     user_data = await user_service.get_user_data_by_id(user_id)
+
+    if user_data is None:
+        raise NotFoundError("User not found")
 
     return JSONResponse(
         content=ResponseSchema[UserSchema](
