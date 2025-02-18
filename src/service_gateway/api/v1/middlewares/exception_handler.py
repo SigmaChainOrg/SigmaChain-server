@@ -9,10 +9,14 @@ async def custom_exception_handler(request: Request, exc: Exception):
     if isinstance(exc, IntegrityError):
         return JSONResponse(
             status_code=500,
-            content=ResponseSchema(msg="Unique key integrity error.").model_dump(),
+            content=ResponseSchema[None](
+                msg="Unique key integrity error.", data=None
+            ).model_dump(),
         )
 
     return JSONResponse(
         status_code=500,
-        content=ResponseSchema(msg="Internal server error.").model_dump(),
+        content=ResponseSchema[None](
+            msg="Internal server error.", data=None
+        ).model_dump(),
     )

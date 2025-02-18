@@ -24,7 +24,7 @@ api_v1.add_exception_handler(Exception, custom_exception_handler)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ResponseSchema(msg=exc.detail).model_dump(),
+        content=ResponseSchema[None](msg=exc.detail, data=None).model_dump(),
     )
 
 
