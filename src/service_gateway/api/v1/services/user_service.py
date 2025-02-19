@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
@@ -188,7 +188,7 @@ class UserService:
 
             raise
 
-    async def create_secure_code(self, user_id: UUID) -> SecureCodeSchema:
+    async def create_secure_code(self, user_id: UUID) -> Tuple[SecureCodeSchema, str]:
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
         try:
@@ -202,10 +202,11 @@ class UserService:
             await self.db.flush()
 
             secure_schema = SecureCodeSchema.model_validate(secure_code)
+            code = secure_code.code
 
             await self.db.commit()
 
-            return secure_schema
+            return (secure_schema, code)
 
         except Exception:
             await self.db.rollback()

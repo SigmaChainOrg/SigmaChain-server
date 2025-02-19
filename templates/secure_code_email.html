@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Verification Code - SigmaChain</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        text-align: center;
+        padding: 20px;
+      }
+      .container {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        margin: auto;
+      }
+      .code-box {
+        background-color: #e3f2fd;
+        color: #0d47a1;
+        font-size: 24px;
+        font-weight: bold;
+        padding: 15px;
+        border-radius: 5px;
+        margin: 20px 0;
+        display: inline-block;
+      }
+      .footer {
+        font-size: 14px;
+        color: #777;
+        margin-top: 20px;
+      }
+      .link {
+        color: #1565c0;
+        text-decoration: none;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Verification Code</h2>
+      <p>Hello!</p>
+      <p>Your verification code is:</p>
+      <div class="code-box">{{ secure_code }}</div>
+      <p>If you lost your link, you can access it here:</p>
+      <p><a class="link" href="{{ link }}">{{ link }}</a></p>
+      <p class="footer">
+        This email was sent by SigmaChain. If you didn't request this, please
+        ignore it.
+      </p>
+    </div>
+  </body>
+</html>

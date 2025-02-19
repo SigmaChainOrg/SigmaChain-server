@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -23,11 +24,13 @@ from src.service_gateway.security.authentication import (
     validate_password,
     validate_password_match,
 )
+from src.utils.email_sender import send_html_email
 from src.utils.http_exceptions import (
     AuthenticationError,
     BadRequestError,
     NotFoundError,
 )
+from src.utils.template_loader import load_html_template
 
 security = HTTPBearer()
 
@@ -96,10 +99,29 @@ async def signin(
     if user_schema is None:
         raise NotFoundError("User not found")
 
-    secure_code_response = await user_service.create_secure_code(user_schema.user_id)
+    secure_code_response, code = await user_service.create_secure_code(
+        user_schema.user_id
+    )
 
-    if secure_code_response is None:
+    if code is None:
         raise BadRequestError("Secure code not created")
+
+    template_path = Path("templates/secure_code_email.html")
+
+    html = load_html_template(
+        str(template_path),
+        secure_code=code,
+        link="Link",
+    )
+
+    email_sent = send_html_email(
+        to=user_schema.email,
+        subject="Secure code for SigmaChain",
+        html=html,
+    )
+
+    if not email_sent:
+        raise BadRequestError("Email not sent")
 
     return JSONResponse(
         content=ResponseSchema[SecureCodeSchema](
