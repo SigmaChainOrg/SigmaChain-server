@@ -6,10 +6,15 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
-from src.service_gateway.api.v1.schemas.access_control.auth_schemas import TokenSchema
+from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
+    SecureCodeInput,
+    SecureCodeSchema,
+    TokenSchema,
+)
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
+    UserInfoUpdate,
     UserSchema,
-    UserSignUpSchema,
+    UserSignUpInput,
 )
 from src.service_gateway.api.v1.schemas.general.general_schemas import ResponseSchema
 from src.service_gateway.api.v1.services.user_service import UserService
@@ -41,7 +46,7 @@ class OAuth2EmailRequestForm:
 
 
 @auth_router_open.post("/signup", response_model=ResponseSchema[None], status_code=201)
-async def signup(user_signup: UserSignUpSchema, db: AsyncSession = Depends(get_db)):
+async def signup(user_signup: UserSignUpInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
@@ -68,7 +73,9 @@ async def signup(user_signup: UserSignUpSchema, db: AsyncSession = Depends(get_d
 
 
 @auth_router_open.post(
-    "/signin", response_model=ResponseSchema[TokenSchema], status_code=200
+    "/signin",
+    response_model=ResponseSchema[TokenSchema | SecureCodeSchema],
+    status_code=200,
 )
 async def signin(
     db: AsyncSession = Depends(get_db),
@@ -89,9 +96,44 @@ async def signin(
     if user_schema is None:
         raise NotFoundError("User not found")
 
+    secure_code_response = await user_service.create_secure_code(user_schema.user_id)
+
+    if secure_code_response is None:
+        raise BadRequestError("Secure code not created")
+
+    return JSONResponse(
+        content=ResponseSchema[SecureCodeSchema](
+            msg="Secure code created successfully",
+            data=secure_code_response,
+            ok=True,
+        ).model_dump(),
+    )
+
+
+@auth_router_open.post(
+    "/secure_code",
+    response_model=ResponseSchema[TokenSchema],
+    status_code=200,
+)
+async def secure_code(
+    data: SecureCodeInput,
+    db: AsyncSession = Depends(get_db),
+):
+    user_service = UserService(db)
+
+    verified_response = await user_service.verify_secure_code(data)
+
+    if not verified_response.ok:
+        raise AuthenticationError(verified_response.msg)
+
+    user_id = verified_response.data
+
+    if user_id is None:
+        raise NotFoundError("User not found")
+
     token = create_access_token(
         data={
-            "sub": str(user_schema.user_id),
+            "sub": str(user_id),
         }
     )
 
@@ -109,7 +151,7 @@ async def signin(
     )
 
 
-@auth_router.post("/me", response_model=ResponseSchema[UserSchema], status_code=200)
+@auth_router.get("/me", response_model=ResponseSchema[UserSchema], status_code=200)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
     user_service = UserService(db)
 
@@ -122,6 +164,33 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
     return JSONResponse(
         content=ResponseSchema[UserSchema](
             msg="User signed in successfully",
+            data=user_data,
+            ok=True,
+        ).model_dump(),
+    )
+
+
+@auth_router.patch(
+    "/me/user_info",
+    response_model=ResponseSchema[UserSchema],
+    status_code=200,
+)
+async def update_user_info(
+    data: UserInfoUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user_service = UserService(db)
+
+    user_id: UUID = request.state.user_id
+    user_data = await user_service.update_user_info_data_by_user_id(user_id, data)
+
+    if user_data is None:
+        raise NotFoundError("User not found")
+
+    return JSONResponse(
+        content=ResponseSchema[UserSchema](
+            msg="User info updated successfully",
             data=user_data,
             ok=True,
         ).model_dump(),

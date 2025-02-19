@@ -15,6 +15,7 @@ PUBLIC_ROUTES = [
     "/openapi.json",
     "/auth/signin",
     "/auth/signup",
+    "/auth/secure_code",
 ]
 
 api_public_routes = [f"{API_ROOT}{route}" for route in PUBLIC_ROUTES]

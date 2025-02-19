@@ -1,4 +1,6 @@
 import re
+import secrets
+import string
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -77,3 +79,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def hash_password(password: str) -> str:
     return ph.hash(password)
+
+
+def generate_random_code(length: int) -> str:
+    return "".join(secrets.choice(string.digits) for _ in range(length))
