@@ -12,20 +12,22 @@ api_v1 = FastAPI()
 api_v1.title = "SigmaChain API v1"
 api_v1.version = "0.0.2"
 
-
-# Adding Middlewares
-api_v1.add_middleware(JWTMiddleware)
-
 # Adding Exception Handlers
-api_v1.add_exception_handler(Exception, custom_exception_handler)
 
 
 @api_v1.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ResponseSchema(msg=exc.detail).model_dump(),
+        content=ResponseSchema[None](msg=exc.detail, data=None).model_dump(),
+        headers=exc.headers,
     )
+
+
+api_v1.add_exception_handler(Exception, custom_exception_handler)
+
+# Adding Middlewares
+api_v1.add_middleware(JWTMiddleware)
 
 
 # Mounting routers

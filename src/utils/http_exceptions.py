@@ -30,3 +30,21 @@ class AuthenticationError(HTTPException):
         )
 
     pass
+
+
+class BadRequestError(HTTPException):
+    """Exception when a bad request error occurs."""
+
+    def __init__(self, message: str = "Bad request error.") -> None:
+        super().__init__(status_code=400, detail=message)
+
+    pass
+
+
+class NotFoundError(HTTPException):
+    """Exception when a resource is not found in the database."""
+
+    def __init__(self, message: str = "Resource not found.") -> None:
+        super().__init__(status_code=404, detail=message)
+
+    pass
