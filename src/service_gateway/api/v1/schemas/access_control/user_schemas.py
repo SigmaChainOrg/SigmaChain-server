@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import (
     BaseModel,
+    ConfigDict,
     EmailStr,
     Field,
     SecretStr,
@@ -14,14 +15,16 @@ from pydantic import (
 from src.database.models.access_control.enums import IdTypeEnum
 
 
-class UserSignUpSchema(BaseModel):
+class UserSignUpInput(BaseModel):
     email: EmailStr
     password: SecretStr = Field(exclude=True, repr=False)
     confirm_password: SecretStr = Field(exclude=True, repr=False)
 
 
 class UserInfoSchema(BaseModel):
-    user_info_id: Optional[UUID]
+    model_config = ConfigDict(from_attributes=True)
+
+    user_info_id: UUID
     first_name: Annotated[str, constr(min_length=2, max_length=255)]
     last_name: Annotated[str, constr(min_length=2, max_length=255)]
     id_type: IdTypeEnum
@@ -32,8 +35,17 @@ class UserInfoSchema(BaseModel):
     def serialize_uuid(self, user_info_id: UUID, _info):
         return str(user_info_id)
 
-    class Config:
-        from_attributes = True
+    @field_serializer("birth_date")
+    def serialize_date(self, dt: date, _info):
+        return dt.isoformat()
+
+
+class UserInfoUpdate(BaseModel):
+    first_name: Optional[Annotated[str, constr(min_length=2, max_length=255)]] = None
+    last_name: Optional[Annotated[str, constr(min_length=2, max_length=255)]] = None
+    id_type: Optional[IdTypeEnum] = None
+    id_number: Optional[Annotated[str, constr(min_length=2, max_length=50)]] = None
+    birth_date: Optional[date] = None
 
 
 class UserSchema(BaseModel):
@@ -54,7 +66,3 @@ class UserSchema(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class UserInDBSchema(UserSchema):
-    hashed_password: str

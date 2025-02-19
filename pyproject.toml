@@ -16,6 +16,7 @@ alembic = "^1.14.1"
 psycopg2-binary = "^2.9.10"
 argon2-cffi = "^23.1.0"
 python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+resend = "^2.6.0"
 
 
 [build-system]

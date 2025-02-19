@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -7,5 +7,5 @@ T = TypeVar("T")
 
 class ResponseSchema(BaseModel, Generic[T]):
     msg: str
-    data: Optional[T] = None
+    data: T
     ok: bool = False

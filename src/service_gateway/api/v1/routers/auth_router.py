@@ -1,3 +1,4 @@
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -6,10 +7,15 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
-from src.service_gateway.api.v1.schemas.access_control.auth_schemas import TokenSchema
+from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
+    SecureCodeInput,
+    SecureCodeSchema,
+    TokenSchema,
+)
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
+    UserInfoUpdate,
     UserSchema,
-    UserSignUpSchema,
+    UserSignUpInput,
 )
 from src.service_gateway.api.v1.schemas.general.general_schemas import ResponseSchema
 from src.service_gateway.api.v1.services.user_service import UserService
@@ -18,6 +24,13 @@ from src.service_gateway.security.authentication import (
     validate_password,
     validate_password_match,
 )
+from src.utils.email_sender import send_html_email
+from src.utils.http_exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    NotFoundError,
+)
+from src.utils.template_loader import load_html_template
 
 security = HTTPBearer()
 
@@ -36,24 +49,18 @@ class OAuth2EmailRequestForm:
 
 
 @auth_router_open.post("/signup", response_model=ResponseSchema[None], status_code=201)
-async def signup(user_signup: UserSignUpSchema, db: AsyncSession = Depends(get_db)):
+async def signup(user_signup: UserSignUpInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
-        return JSONResponse(
-            content=ResponseSchema[None](msg=pw_validity.msg).model_dump(),
-            status_code=400,
-        )
+        raise BadRequestError(pw_validity.msg)
 
     pw_validity = validate_password_match(
         user_signup.password.get_secret_value(),
         user_signup.confirm_password.get_secret_value(),
     )
     if not pw_validity.ok:
-        return JSONResponse(
-            content=ResponseSchema[None](msg=pw_validity.msg).model_dump(),
-            status_code=400,
-        )
+        raise BadRequestError(pw_validity.msg)
 
     user_service = UserService(db)
 
@@ -62,13 +69,16 @@ async def signup(user_signup: UserSignUpSchema, db: AsyncSession = Depends(get_d
     return JSONResponse(
         content=ResponseSchema[None](
             msg="User signed up successfully",
+            data=None,
             ok=True,
         ).model_dump(),
     )
 
 
 @auth_router_open.post(
-    "/signin", response_model=ResponseSchema[TokenSchema], status_code=200
+    "/signin",
+    response_model=ResponseSchema[TokenSchema | SecureCodeSchema],
+    status_code=200,
 )
 async def signin(
     db: AsyncSession = Depends(get_db),
@@ -82,30 +92,70 @@ async def signin(
     )
 
     if not verified_response.ok:
-        return JSONResponse(
-            content=ResponseSchema[None](
-                msg="Invalid email or password",
-                ok=False,
-            ).model_dump(),
-            headers={"WWW-Authenticate": "Bearer"},
-            status_code=401,
-        )
+        raise AuthenticationError("Invalid email or password")
 
     user_schema = verified_response.data
 
     if user_schema is None:
-        return JSONResponse(
-            content=ResponseSchema[None](
-                msg="Invalid email or password",
-                ok=False,
-            ).model_dump(),
-            headers={"WWW-Authenticate": "Bearer"},
-            status_code=404,
-        )
+        raise NotFoundError("User not found")
+
+    secure_code_response, code = await user_service.create_secure_code(
+        user_schema.user_id
+    )
+
+    if code is None:
+        raise BadRequestError("Secure code not created")
+
+    template_path = Path("templates/secure_code_email.html")
+
+    html = load_html_template(
+        str(template_path),
+        secure_code=code,
+        link="Link",
+    )
+
+    email_sent = send_html_email(
+        to=user_schema.email,
+        subject="Secure code for SigmaChain",
+        html=html,
+    )
+
+    if not email_sent:
+        raise BadRequestError("Email not sent")
+
+    return JSONResponse(
+        content=ResponseSchema[SecureCodeSchema](
+            msg="Secure code created successfully",
+            data=secure_code_response,
+            ok=True,
+        ).model_dump(),
+    )
+
+
+@auth_router_open.post(
+    "/secure_code",
+    response_model=ResponseSchema[TokenSchema],
+    status_code=200,
+)
+async def secure_code(
+    data: SecureCodeInput,
+    db: AsyncSession = Depends(get_db),
+):
+    user_service = UserService(db)
+
+    verified_response = await user_service.verify_secure_code(data)
+
+    if not verified_response.ok:
+        raise AuthenticationError(verified_response.msg)
+
+    user_id = verified_response.data
+
+    if user_id is None:
+        raise NotFoundError("User not found")
 
     token = create_access_token(
         data={
-            "sub": str(user_schema.user_id),
+            "sub": str(user_id),
         }
     )
 
@@ -123,16 +173,46 @@ async def signin(
     )
 
 
-@auth_router.post("/me", response_model=ResponseSchema[UserSchema], status_code=200)
+@auth_router.get("/me", response_model=ResponseSchema[UserSchema], status_code=200)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
     user_service = UserService(db)
 
-    user_id: UUID = request.user
+    user_id: UUID = request.state.user_id
     user_data = await user_service.get_user_data_by_id(user_id)
+
+    if user_data is None:
+        raise NotFoundError("User not found")
 
     return JSONResponse(
         content=ResponseSchema[UserSchema](
             msg="User signed in successfully",
+            data=user_data,
+            ok=True,
+        ).model_dump(),
+    )
+
+
+@auth_router.patch(
+    "/me/user_info",
+    response_model=ResponseSchema[UserSchema],
+    status_code=200,
+)
+async def update_user_info(
+    data: UserInfoUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user_service = UserService(db)
+
+    user_id: UUID = request.state.user_id
+    user_data = await user_service.update_user_info_data_by_user_id(user_id, data)
+
+    if user_data is None:
+        raise NotFoundError("User not found")
+
+    return JSONResponse(
+        content=ResponseSchema[UserSchema](
+            msg="User info updated successfully",
             data=user_data,
             ok=True,
         ).model_dump(),
