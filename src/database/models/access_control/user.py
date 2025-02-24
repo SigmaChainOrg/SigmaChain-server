@@ -72,13 +72,9 @@ class UserInfo(Base):
     __tablename__ = "user_info"
     __table_args__ = {"schema": "access_control"}
 
-    user_info_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("access_control.user.user_id", ondelete="CASCADE"),
+        primary_key=True,
         nullable=False,
         unique=True,
     )
@@ -110,7 +106,7 @@ class UserInfo(Base):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "user_info_id": self.user_info_id,
+            "user_id": self.user_id,
             "first_name": self.first_name,
             "last_name": self.last_name,
             "id_type": self.id_type,
