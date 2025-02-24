@@ -148,14 +148,15 @@ async def secure_code(
     if not verified_response.ok:
         raise AuthenticationError(verified_response.msg)
 
-    user_id = verified_response.data
+    user_id_and_roles = verified_response.data
 
-    if user_id is None:
+    if user_id_and_roles is None:
         raise NotFoundError("User not found")
 
     token = create_access_token(
         data={
-            "sub": str(user_id),
+            "sub": str(user_id_and_roles[0]),
+            "roles": user_id_and_roles[1],
         }
     )
 

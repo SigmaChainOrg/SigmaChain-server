@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from src.database.models.access_control.enums import RoleEnum
+from src.database.models.access_control.role import UserRoles
 from src.database.models.access_control.secure_code import SecureCode
 from src.database.models.access_control.user import User, UserInfo
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
@@ -68,6 +70,12 @@ class UserService:
             hashed_password=hashed_password,
         )
         self.db.add(new_user)
+
+        await self.db.flush()
+        await self.db.refresh(new_user)
+
+        new_user_role = UserRoles(user_id=new_user.user_id, role=RoleEnum.REQUESTER)
+        self.db.add(new_user_role)
 
         try:
             await self.db.commit()
@@ -150,7 +158,7 @@ class UserService:
 
     async def verify_secure_code(
         self, secure_code_input: SecureCodeInput
-    ) -> ResponseComplete[Optional[UUID]]:
+    ) -> ResponseComplete[Optional[Tuple[UUID, List[str]]]]:
         try:
             result = await self.db.execute(
                 select(SecureCode).filter(
@@ -169,14 +177,25 @@ class UserService:
                 return ResponseComplete(msg="Secure code expired", data=None, ok=False)
 
             if secure_code.has_been_used:
-                return ResponseComplete[Optional[UUID]](
+                return ResponseComplete(
                     msg="Secure code already used", data=None, ok=False
                 )
 
             secure_code.has_been_used = True
 
-            response = ResponseComplete[Optional[UUID]](
-                msg="Secure code verified", data=secure_code.user_id, ok=True
+            result_user_roles = await self.db.execute(
+                select(UserRoles).filter(UserRoles.user_id == secure_code.user_id)
+            )
+
+            user_roles = result_user_roles.scalars().all()
+
+            if not user_roles:
+                raise BadRequestError("User not found")
+
+            roles = [user_role.role.value for user_role in user_roles]
+
+            response = ResponseComplete[Optional[Tuple[UUID, List[str]]]](
+                msg="Secure code verified", data=(secure_code.user_id, roles), ok=True
             )
 
             await self.db.commit()
