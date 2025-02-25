@@ -11,13 +11,13 @@ from src.database.models.access_control.role import UserRoles
 from src.database.models.access_control.secure_code import SecureCode
 from src.database.models.access_control.user import User, UserInfo
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
-    SecureCodeInput,
-    SecureCodeSchema,
+    SecureCodeRead,
+    SecureCodeValidate,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
+    UserCreate,
     UserInfoUpdate,
-    UserSchema,
-    UserSignUpInput,
+    UserRead,
 )
 from src.service_gateway.security.authentication import (
     generate_random_code,
@@ -62,7 +62,7 @@ class UserService:
 
     ## Public methods
 
-    async def create_user(self, user_signin: UserSignUpInput) -> None:
+    async def create_user(self, user_signin: UserCreate) -> None:
         hashed_password = hash_password(user_signin.password.get_secret_value())
 
         new_user = User(
@@ -87,7 +87,7 @@ class UserService:
 
             raise DatabaseIntegrityError()
 
-    async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserSchema]:
+    async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserRead]:
         result = await self.db.execute(
             select(User).filter(
                 User.user_id == user_id,
@@ -99,11 +99,11 @@ class UserService:
         if user is None:
             return None
 
-        return UserSchema.model_validate(user)
+        return UserRead.model_validate(user)
 
     async def update_user_info_data_by_user_id(
         self, user_id: UUID, user_info_data: UserInfoUpdate
-    ) -> Optional[UserSchema]:
+    ) -> Optional[UserRead]:
         user = await self.__get_user_by_id(user_id)
 
         if user is None:
@@ -121,7 +121,7 @@ class UserService:
 
         await self.db.refresh(user)
 
-        user_schema = UserSchema.model_validate(user)
+        user_schema = UserRead.model_validate(user)
 
         await self.db.commit()
 
@@ -131,13 +131,13 @@ class UserService:
         self,
         email: str,
         password: str,
-    ) -> ResponseData[Optional[UserSchema]]:
+    ) -> ResponseData[Optional[UserRead]]:
         user = await self.__get_user_by_email(email)
 
         if user is None:
             return ResponseData(data=None, ok=False)
 
-        user_schema = UserSchema.model_validate(user)
+        user_schema = UserRead.model_validate(user)
         return ResponseData(
             data=user_schema,
             ok=verify_password(password, user.hashed_password),
@@ -157,7 +157,7 @@ class UserService:
         return True
 
     async def verify_secure_code(
-        self, secure_code_input: SecureCodeInput
+        self, secure_code_input: SecureCodeValidate
     ) -> ResponseComplete[Optional[Tuple[UUID, List[str]]]]:
         try:
             result = await self.db.execute(
@@ -207,7 +207,7 @@ class UserService:
 
             raise
 
-    async def create_secure_code(self, user_id: UUID) -> Tuple[SecureCodeSchema, str]:
+    async def create_secure_code(self, user_id: UUID) -> Tuple[SecureCodeRead, str]:
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
         try:
@@ -220,7 +220,7 @@ class UserService:
 
             await self.db.flush()
 
-            secure_schema = SecureCodeSchema.model_validate(secure_code)
+            secure_schema = SecureCodeRead.model_validate(secure_code)
             code = secure_code.code
 
             await self.db.commit()

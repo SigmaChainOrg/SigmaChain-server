@@ -1,15 +1,19 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer
+
+from src.utils.serializers import serialize_datetime
 
 
-class TokenSchema(BaseModel):
+class TokenRead(BaseModel):
     access_token: str
     token_type: str
 
 
-class SecureCodeSchema(BaseModel):
+class SecureCodeRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     secure_code_id: UUID
     expires_at: datetime
 
@@ -18,13 +22,10 @@ class SecureCodeSchema(BaseModel):
         return str(secure_code_id)
 
     @field_serializer("expires_at")
-    def serialize_datetime(self, dt: datetime, _info):
-        return dt.isoformat()
-
-    class Config:
-        from_attributes = True
+    def serialize_expires_at(self, dt: datetime, _info):
+        return serialize_datetime(dt)
 
 
-class SecureCodeInput(BaseModel):
+class SecureCodeValidate(BaseModel):
     secure_code_id: UUID
     code: str

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 T = TypeVar("T")
 
 
-class ResponseSchema(BaseModel, Generic[T]):
+class APIResponse(BaseModel, Generic[T]):
     msg: str
     data: T
     ok: bool = False
