@@ -13,6 +13,7 @@ from pydantic import (
 )
 
 from src.database.models.access_control.enums import IdTypeEnum
+from src.utils.serializers import serialize_datetime
 
 
 class UserSignUpInput(BaseModel):
@@ -56,8 +57,8 @@ class UserSchema(BaseModel):
         return str(user_id)
 
     @field_serializer("created_at")
-    def serialize_datetime(self, dt: datetime, _info):
-        return dt.isoformat()
+    def serialize_created_at(self, dt: datetime, _info):
+        return serialize_datetime(dt)
 
     class Config:
         from_attributes = True
