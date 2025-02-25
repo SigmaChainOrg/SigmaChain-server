@@ -24,6 +24,7 @@ class User(Base):
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
+        init=False,
     )
     email: Mapped[str] = mapped_column(
         String(255),
@@ -38,6 +39,7 @@ class User(Base):
         DateTime,
         server_default=func.now(),
         nullable=False,
+        init=False,
     )
 
     user_info: Mapped["UserInfo"] = relationship(
@@ -45,11 +47,17 @@ class User(Base):
         back_populates="user",
         uselist=False,
         lazy="joined",
+        init=False,
     )
-    roles: Mapped[list["UserRoles"]] = relationship("UserRoles", back_populates="user")
+    roles: Mapped[list["UserRoles"]] = relationship(
+        "UserRoles",
+        back_populates="user",
+        init=False,
+    )
     groups: Mapped[list["UserGroups"]] = relationship(
         "UserGroups",
         back_populates="user",
+        init=False,
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -63,7 +71,7 @@ class User(Base):
 
     def to_dict_with_password(self) -> Dict[str, Any]:
         return {
-            **self.to_dict_user(),
+            **self.to_dict(),
             "hashed_password": self.hashed_password,
         }
 
@@ -95,6 +103,7 @@ class UserInfo(Base):
         back_populates="user_info",
         uselist=False,
         lazy="joined",
+        init=False,
     )
 
     def to_dict(self) -> Dict[str, Any]:

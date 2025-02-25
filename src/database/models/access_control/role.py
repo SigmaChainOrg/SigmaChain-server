@@ -36,7 +36,12 @@ class UserRoles(Base):
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="roles", uselist=False)
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="roles",
+        uselist=False,
+        init=False,
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -52,7 +57,9 @@ class Policy(Base):
     policy_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         nullable=False,
+        init=False,
     )
     role: Mapped[RoleEnum] = mapped_column(RoleEnumSQLA, nullable=False)
     resource: Mapped[ResourceEnum] = mapped_column(ResourceEnumSQLA, nullable=False)
