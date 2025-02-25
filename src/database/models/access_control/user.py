@@ -4,12 +4,12 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Dict
 
-from sqlalchemy import UUID, Boolean, DateTime, Enum, ForeignKey, String
+from sqlalchemy import UUID, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from src.database.configuration import Base
-from src.database.models.access_control.enums import IdTypeEnum
+from src.database.models.access_control.enums import IdTypeEnum, IdTypeEnumSQLA
 
 if TYPE_CHECKING:
     from src.database.models.access_control.group import UserGroups
@@ -80,14 +80,7 @@ class UserInfo(Base):
     )
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    id_type: Mapped[IdTypeEnum] = mapped_column(
-        Enum(
-            IdTypeEnum,
-            name="id_type_enum",
-            schema="access_control",
-        ),
-        nullable=False,
-    )
+    id_type: Mapped[IdTypeEnum] = mapped_column(IdTypeEnumSQLA, nullable=False)
     id_number: Mapped[str] = mapped_column(String(50), nullable=False)
     birth_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -109,7 +102,7 @@ class UserInfo(Base):
             "user_id": self.user_id,
             "first_name": self.first_name,
             "last_name": self.last_name,
-            "id_type": self.id_type,
+            "id_type": self.id_type.value,
             "id_number": self.id_number,
             "birth_date": self.birth_date,
         }
