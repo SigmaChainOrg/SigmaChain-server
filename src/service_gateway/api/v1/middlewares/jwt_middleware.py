@@ -6,7 +6,7 @@ from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.service_gateway.api.v1.routers.auth_router import auth_router_open
-from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
+from src.service_gateway.api.v1.schemas.general.general_schemas import APIErrorResponse
 from src.service_gateway.security.authentication import decode_access_token
 
 API_ROOT = "/api/v1"
@@ -36,8 +36,8 @@ class JWTMiddleware(BaseHTTPMiddleware):
         if not authorization or not authorization.startswith("Bearer "):
             return JSONResponse(
                 status_code=401,
-                content=APIResponse[None](
-                    msg="Token missing or invalid.", data=None
+                content=APIErrorResponse(
+                    detail="Token missing or invalid."
                 ).model_dump(),
                 headers={"WWW-Authenticate": "Bearer"},
             )
@@ -49,9 +49,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
         if not decode_result.data:
             return JSONResponse(
                 status_code=401,
-                content=APIResponse[None](
-                    msg=decode_result.msg, data=None
-                ).model_dump(),
+                content=APIErrorResponse(detail=decode_result.msg).model_dump(),
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -62,7 +60,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
         except ValueError:
             return JSONResponse(
                 status_code=401,
-                content=APIResponse[None](msg="Invalid token.", data=None).model_dump(),
+                content=APIErrorResponse(detail="Invalid token.").model_dump(),
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
