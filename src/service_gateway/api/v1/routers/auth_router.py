@@ -133,11 +133,11 @@ async def signin(
 
 
 @auth_router_open.post(
-    "/secure_code",
+    "/secure-code/validate",
     response_model=APIResponse[TokenRead],
     status_code=200,
 )
-async def secure_code(
+async def validate_secure_code(
     data: SecureCodeValidate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -194,7 +194,7 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @auth_router.patch(
-    "/me/user_info",
+    "/me/user-info",
     response_model=APIResponse[UserRead],
     status_code=200,
 )

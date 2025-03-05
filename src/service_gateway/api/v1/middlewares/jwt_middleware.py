@@ -2,8 +2,10 @@ from uuid import UUID
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from src.service_gateway.api.v1.routers.auth_router import auth_router_open
 from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
 from src.service_gateway.security.authentication import decode_access_token
 
@@ -13,12 +15,16 @@ PUBLIC_ROUTES = [
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/auth/signin",
-    "/auth/signup",
-    "/auth/secure_code",
+]
+
+auth_open_routes = [
+    f"{API_ROOT}{route.path}"
+    for route in auth_router_open.routes
+    if isinstance(route, APIRoute)
 ]
 
 api_public_routes = [f"{API_ROOT}{route}" for route in PUBLIC_ROUTES]
+api_public_routes.extend(auth_open_routes)
 
 
 class JWTMiddleware(BaseHTTPMiddleware):
