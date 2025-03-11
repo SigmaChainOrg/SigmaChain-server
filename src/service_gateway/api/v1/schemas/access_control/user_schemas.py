@@ -13,7 +13,7 @@ from pydantic import (
 )
 
 from src.database.models.access_control.enums import IdTypeEnum
-from src.utils.serializers import serialize_datetime
+from src.utils.serializers import serialize_datetime, serialize_uuid
 
 
 class UserCreate(BaseModel):
@@ -55,8 +55,8 @@ class UserRead(BaseModel):
     user_info: Optional[UserInfoRead]
 
     @field_serializer("user_id")
-    def serialize_uuid(self, user_id: UUID, _info):
-        return str(user_id)
+    def serialize_user_uuid(self, user_id: UUID, _info):
+        return serialize_uuid(user_id)
 
     @field_serializer("created_at")
     def serialize_created_at(self, dt: datetime, _info):

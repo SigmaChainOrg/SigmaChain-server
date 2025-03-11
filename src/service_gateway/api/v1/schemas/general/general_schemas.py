@@ -1,6 +1,6 @@
 from typing import Generic, List, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 
@@ -8,7 +8,7 @@ T = TypeVar("T")
 class APIResponse(BaseModel, Generic[T]):
     msg: str
     data: T
-    ok: bool = False
+    ok: bool = Field(default=False, examples=[True, False])
 
 
 class APIErrorResponse(BaseModel):

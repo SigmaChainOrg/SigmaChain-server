@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 
-from src.utils.serializers import serialize_datetime
+from src.utils.serializers import serialize_datetime, serialize_uuid
 
 
 class TokenRead(BaseModel):
@@ -18,8 +18,8 @@ class SecureCodeRead(BaseModel):
     expires_at: datetime
 
     @field_serializer("secure_code_id")
-    def serialize_uuid(self, secure_code_id: UUID, _info):
-        return str(secure_code_id)
+    def serialize_secure_code_uuid(self, secure_code_id: UUID, _info):
+        return serialize_uuid(secure_code_id)
 
     @field_serializer("expires_at")
     def serialize_expires_at(self, dt: datetime, _info):

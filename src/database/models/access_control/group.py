@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict
 
 from sqlalchemy import UUID, ForeignKey, String
@@ -13,7 +12,6 @@ if TYPE_CHECKING:
     from src.database.models.access_control.user import User
 
 
-@dataclass
 class UserGroups(Base):
     __tablename__ = "user_groups"
     __table_args__ = {"schema": "access_control"}
@@ -51,7 +49,6 @@ class UserGroups(Base):
         }
 
 
-@dataclass
 class Group(Base):
     __tablename__ = "group"
     __table_args__ = {"schema": "access_control"}
