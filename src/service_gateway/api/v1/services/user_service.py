@@ -36,11 +36,11 @@ class UserService:
     def __init__(self, db: AsyncSession) -> None:
         self.db: AsyncSession = db
 
-    ## Private methods
+    ## Friendly methods
 
-    async def __get_user_by_email(self, email: str) -> Optional[User]:
+    async def _get_user_by_email(self, email: str) -> Optional[User]:
         result = await self.db.execute(
-            select(User).filter(
+            select(User).where(
                 User.email == email,
                 User.is_active.is_(True),
             )
@@ -49,9 +49,9 @@ class UserService:
 
         return user
 
-    async def __get_user_by_id(self, user_id: UUID) -> Optional[User]:
+    async def _get_user_by_id(self, user_id: UUID) -> Optional[User]:
         result = await self.db.execute(
-            select(User).filter(
+            select(User).where(
                 User.user_id == user_id,
                 User.is_active.is_(True),
             )
@@ -89,7 +89,7 @@ class UserService:
 
     async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserRead]:
         result = await self.db.execute(
-            select(User).filter(
+            select(User).where(
                 User.user_id == user_id,
                 User.is_active.is_(True),
             )
@@ -104,7 +104,7 @@ class UserService:
     async def update_user_info_data_by_user_id(
         self, user_id: UUID, user_info_data: UserInfoUpdate
     ) -> Optional[UserRead]:
-        user = await self.__get_user_by_id(user_id)
+        user = await self._get_user_by_id(user_id)
 
         if user is None:
             raise BadRequestError("User not found")
@@ -132,7 +132,7 @@ class UserService:
         email: str,
         password: str,
     ) -> ResponseData[Optional[UserRead]]:
-        user = await self.__get_user_by_email(email)
+        user = await self._get_user_by_email(email)
 
         if user is None:
             return ResponseData(data=None, ok=False)
@@ -144,7 +144,7 @@ class UserService:
         )
 
     async def change_user_password(self, email: str, new_password: str) -> bool:
-        user = await self.__get_user_by_email(email)
+        user = await self._get_user_by_email(email)
 
         if user is None:
             return False
@@ -161,7 +161,7 @@ class UserService:
     ) -> ResponseComplete[Optional[Tuple[UUID, List[str]]]]:
         try:
             result = await self.db.execute(
-                select(SecureCode).filter(
+                select(SecureCode).where(
                     SecureCode.secure_code_id == secure_code_input.secure_code_id,
                     SecureCode.code == secure_code_input.code,
                 )
@@ -184,7 +184,7 @@ class UserService:
             secure_code.has_been_used = True
 
             result_user_roles = await self.db.execute(
-                select(UserRoles).filter(UserRoles.user_id == secure_code.user_id)
+                select(UserRoles).where(UserRoles.user_id == secure_code.user_id)
             )
 
             user_roles = result_user_roles.scalars().all()
