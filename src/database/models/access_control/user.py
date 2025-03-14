@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from sqlalchemy import UUID, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -12,7 +12,7 @@ from src.database.configuration import Base
 from src.database.models.access_control.enums import IdTypeEnum, IdTypeEnumSQLA
 
 if TYPE_CHECKING:
-    from src.database.models.access_control.group import UserGroups
+    from src.database.models.access_control.group import Group
     from src.database.models.access_control.role import UserRoles
 
 
@@ -49,19 +49,21 @@ class User(Base):
         lazy="joined",
         init=False,
     )
-    roles: Mapped[list["UserRoles"]] = relationship(
+    roles: Mapped[List["UserRoles"]] = relationship(
         "UserRoles",
         back_populates="user",
         init=False,
     )
-    groups: Mapped[list["UserGroups"]] = relationship(
-        "UserGroups",
-        back_populates="user",
+    groups: Mapped[List["Group"]] = relationship(
+        "Group",
+        secondary="access_control.user_groups",
+        back_populates="users",
+        overlaps="group",
         init=False,
     )
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
+    def to_dict(self, with_user_info: bool = False) -> Dict[str, Any]:
+        user_dict = {
             "user_id": self.user_id,
             "email": self.email,
             "is_active": self.is_active,
@@ -69,11 +71,10 @@ class User(Base):
             "created_at": self.created_at,
         }
 
-    def to_dict_with_password(self) -> Dict[str, Any]:
-        return {
-            **self.to_dict(),
-            "hashed_password": self.hashed_password,
-        }
+        if with_user_info:
+            user_dict["user_info"] = self.user_info.to_dict()
+
+        return user_dict
 
 
 class UserInfo(Base):

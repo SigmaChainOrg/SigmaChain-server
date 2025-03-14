@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
 from src.service_gateway.api.v1.schemas.access_control.group_schemas import (
+    GroupAssignUserInput,
+    GroupFilters,
     GroupInput,
+    GroupQuery,
     GroupRead,
     GroupUpdate,
 )
@@ -27,14 +30,39 @@ groups_router = APIRouter(
     response_model=APIResponse[List[GroupRead]],
     status_code=200,
 )
-async def get_groups(db: AsyncSession = Depends(get_db)):
+async def get_groups(
+    filters: GroupFilters = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
     group_service = GroupService(db)
-    groups = await group_service.get_groups()
+    groups = await group_service.get_groups(filters)
 
     return JSONResponse(
         content=APIResponse[List[GroupRead]](
             data=groups,
             msg="Groups retrieved successfully",
+            ok=True,
+        ).model_dump()
+    )
+
+
+@groups_router.get(
+    "/{group_id}",
+    response_model=APIResponse[GroupRead],
+    status_code=200,
+)
+async def get_group(
+    group_id: UUID,
+    query: GroupQuery = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
+    group_service = GroupService(db)
+    group = await group_service.get_group(group_id, query)
+
+    return JSONResponse(
+        content=APIResponse[GroupRead](
+            data=group,
+            msg="Group retrieved successfully",
             ok=True,
         ).model_dump()
     )
@@ -73,6 +101,26 @@ async def update_group(
         content=APIResponse[GroupRead](
             data=updated_group,
             msg="Group updated successfully",
+            ok=True,
+        ).model_dump()
+    )
+
+
+@groups_router.post(
+    "/assign-user",
+    response_model=APIResponse[GroupRead],
+    status_code=200,
+)
+async def assign_user_to_group(
+    input: GroupAssignUserInput, db: AsyncSession = Depends(get_db)
+):
+    group_service = GroupService(db)
+    updated_group = await group_service.assign_user_to_group(input)
+
+    return JSONResponse(
+        content=APIResponse[GroupRead](
+            data=updated_group,
+            msg="User assigned to group successfully",
             ok=True,
         ).model_dump()
     )
