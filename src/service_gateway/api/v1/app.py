@@ -10,7 +10,7 @@ from src.service_gateway.api.v1.schemas.general.general_schemas import APIErrorR
 
 api_v1 = FastAPI()
 api_v1.title = "SigmaChain API v1"
-api_v1.version = "0.0.2"
+api_v1.version = "0.0.3"
 
 # Adding Exception Handlers
 
