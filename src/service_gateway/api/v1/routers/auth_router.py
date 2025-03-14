@@ -1,23 +1,24 @@
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
-    SecureCodeInput,
-    SecureCodeSchema,
-    TokenSchema,
+    SecureCodeRead,
+    SecureCodeValidate,
+    TokenRead,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserInfoUpdate,
-    UserSchema,
-    UserSignUpInput,
+    UserInput,
+    UserRead,
+    UserSignInInput,
 )
-from src.service_gateway.api.v1.schemas.general.general_schemas import ResponseSchema
+from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
 from src.service_gateway.api.v1.services.user_service import UserService
 from src.service_gateway.security.authentication import (
     create_access_token,
@@ -38,18 +39,8 @@ auth_router_open = APIRouter(prefix="/auth", tags=["Auth"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"], dependencies=[Depends(security)])
 
 
-class OAuth2EmailRequestForm:
-    def __init__(
-        self,
-        email: str = Form(...),
-        password: str = Form(..., extra={"type": "password"}),
-    ):
-        self.email = email
-        self.password = password
-
-
-@auth_router_open.post("/signup", response_model=ResponseSchema[None], status_code=201)
-async def signup(user_signup: UserSignUpInput, db: AsyncSession = Depends(get_db)):
+@auth_router_open.post("/signup", response_model=APIResponse[None], status_code=201)
+async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
@@ -67,7 +58,7 @@ async def signup(user_signup: UserSignUpInput, db: AsyncSession = Depends(get_db
     await user_service.create_user(user_signup)
 
     return JSONResponse(
-        content=ResponseSchema[None](
+        content=APIResponse[None](
             msg="User signed up successfully",
             data=None,
             ok=True,
@@ -77,27 +68,18 @@ async def signup(user_signup: UserSignUpInput, db: AsyncSession = Depends(get_db
 
 @auth_router_open.post(
     "/signin",
-    response_model=ResponseSchema[TokenSchema | SecureCodeSchema],
+    response_model=APIResponse[TokenRead | SecureCodeRead],
     status_code=200,
 )
 async def signin(
+    input: UserSignInInput,
     db: AsyncSession = Depends(get_db),
-    form_data: OAuth2EmailRequestForm = Depends(),
 ):
     user_service = UserService(db)
 
-    verified_response = await user_service.verify_user_password(
-        email=form_data.email,
-        password=form_data.password,
-    )
-
-    if not verified_response.ok:
-        raise AuthenticationError("Invalid email or password")
+    verified_response = await user_service.verify_user_password(input)
 
     user_schema = verified_response.data
-
-    if user_schema is None:
-        raise NotFoundError("User not found")
 
     secure_code_response, code = await user_service.create_secure_code(
         user_schema.user_id
@@ -124,7 +106,7 @@ async def signin(
         raise BadRequestError("Email not sent")
 
     return JSONResponse(
-        content=ResponseSchema[SecureCodeSchema](
+        content=APIResponse[SecureCodeRead](
             msg="Secure code created successfully",
             data=secure_code_response,
             ok=True,
@@ -133,12 +115,12 @@ async def signin(
 
 
 @auth_router_open.post(
-    "/secure_code",
-    response_model=ResponseSchema[TokenSchema],
+    "/secure-code/validate",
+    response_model=APIResponse[TokenRead],
     status_code=200,
 )
-async def secure_code(
-    data: SecureCodeInput,
+async def validate_secure_code(
+    data: SecureCodeValidate,
     db: AsyncSession = Depends(get_db),
 ):
     user_service = UserService(db)
@@ -148,24 +130,25 @@ async def secure_code(
     if not verified_response.ok:
         raise AuthenticationError(verified_response.msg)
 
-    user_id = verified_response.data
+    user_id_and_roles = verified_response.data
 
-    if user_id is None:
+    if user_id_and_roles is None:
         raise NotFoundError("User not found")
 
     token = create_access_token(
         data={
-            "sub": str(user_id),
+            "sub": str(user_id_and_roles[0]),
+            "roles": user_id_and_roles[1],
         }
     )
 
-    token_schema = TokenSchema(
+    token_schema = TokenRead(
         access_token=token,
         token_type="bearer",
     )
 
     return JSONResponse(
-        content=ResponseSchema[TokenSchema](
+        content=APIResponse[TokenRead](
             msg="User signed in successfully",
             data=token_schema,
             ok=True,
@@ -173,7 +156,7 @@ async def secure_code(
     )
 
 
-@auth_router.get("/me", response_model=ResponseSchema[UserSchema], status_code=200)
+@auth_router.get("/me", response_model=APIResponse[UserRead], status_code=200)
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
     user_service = UserService(db)
 
@@ -184,7 +167,7 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
         raise NotFoundError("User not found")
 
     return JSONResponse(
-        content=ResponseSchema[UserSchema](
+        content=APIResponse[UserRead](
             msg="User signed in successfully",
             data=user_data,
             ok=True,
@@ -193,8 +176,8 @@ async def me(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @auth_router.patch(
-    "/me/user_info",
-    response_model=ResponseSchema[UserSchema],
+    "/me/user-info",
+    response_model=APIResponse[UserRead],
     status_code=200,
 )
 async def update_user_info(
@@ -211,7 +194,7 @@ async def update_user_info(
         raise NotFoundError("User not found")
 
     return JSONResponse(
-        content=ResponseSchema[UserSchema](
+        content=APIResponse[UserRead](
             msg="User info updated successfully",
             data=user_data,
             ok=True,

@@ -2,7 +2,7 @@ from typing import AsyncGenerator
 
 from decouple import UndefinedValueError, config
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
 # Ensure all models are imported
 import src.database.models  # noqa
@@ -35,7 +35,9 @@ async_session_factory = async_sessionmaker(
     autocommit=False,
 )
 
-Base = declarative_base()
+
+class Base(DeclarativeBase, MappedAsDataclass):
+    """Base class for all models"""
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

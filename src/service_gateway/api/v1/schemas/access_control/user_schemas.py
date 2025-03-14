@@ -13,27 +13,28 @@ from pydantic import (
 )
 
 from src.database.models.access_control.enums import IdTypeEnum
+from src.utils.serializers import serialize_datetime, serialize_uuid
 
 
-class UserSignUpInput(BaseModel):
+class UserInput(BaseModel):
     email: EmailStr
     password: SecretStr = Field(exclude=True, repr=False)
     confirm_password: SecretStr = Field(exclude=True, repr=False)
 
 
-class UserInfoSchema(BaseModel):
+class UserSignInInput(BaseModel):  # En lugar de UserLogin
+    email: EmailStr
+    password: SecretStr = Field(exclude=True, repr=False)
+
+
+class UserInfoRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    user_info_id: UUID
     first_name: Annotated[str, constr(min_length=2, max_length=255)]
     last_name: Annotated[str, constr(min_length=2, max_length=255)]
     id_type: IdTypeEnum
     id_number: Annotated[str, constr(min_length=2, max_length=50)]
     birth_date: date
-
-    @field_serializer("user_info_id")
-    def serialize_uuid(self, user_info_id: UUID, _info):
-        return str(user_info_id)
 
     @field_serializer("birth_date")
     def serialize_date(self, dt: date, _info):
@@ -48,21 +49,20 @@ class UserInfoUpdate(BaseModel):
     birth_date: Optional[date] = None
 
 
-class UserSchema(BaseModel):
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: UUID
     email: EmailStr
     is_active: bool
     is_verified: bool
     created_at: datetime
-    user_info: Optional[UserInfoSchema]
+    user_info: Optional[UserInfoRead]
 
     @field_serializer("user_id")
-    def serialize_uuid(self, user_id: UUID, _info):
-        return str(user_id)
+    def serialize_user_uuid(self, user_id: UUID, _info):
+        return serialize_uuid(user_id)
 
     @field_serializer("created_at")
-    def serialize_datetime(self, dt: datetime, _info):
-        return dt.isoformat()
-
-    class Config:
-        from_attributes = True
+    def serialize_created_at(self, dt: datetime, _info):
+        return serialize_datetime(dt)

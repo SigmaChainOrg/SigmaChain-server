@@ -6,11 +6,11 @@ from src.service_gateway.api.v1.middlewares.exception_handler import (
 )
 from src.service_gateway.api.v1.middlewares.jwt_middleware import JWTMiddleware
 from src.service_gateway.api.v1.routers.main_router import api_v1_router
-from src.service_gateway.api.v1.schemas.general.general_schemas import ResponseSchema
+from src.service_gateway.api.v1.schemas.general.general_schemas import APIErrorResponse
 
 api_v1 = FastAPI()
 api_v1.title = "SigmaChain API v1"
-api_v1.version = "0.0.2"
+api_v1.version = "0.0.3"
 
 # Adding Exception Handlers
 
@@ -19,7 +19,7 @@ api_v1.version = "0.0.2"
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
-        content=ResponseSchema[None](msg=exc.detail, data=None).model_dump(),
+        content=APIErrorResponse(detail=exc.detail).model_dump(),
         headers=exc.headers,
     )
 
