@@ -16,10 +16,15 @@ from src.database.models.access_control.enums import IdTypeEnum
 from src.utils.serializers import serialize_datetime, serialize_uuid
 
 
-class UserCreate(BaseModel):
+class UserInput(BaseModel):
     email: EmailStr
     password: SecretStr = Field(exclude=True, repr=False)
     confirm_password: SecretStr = Field(exclude=True, repr=False)
+
+
+class UserSignInInput(BaseModel):  # En lugar de UserLogin
+    email: EmailStr
+    password: SecretStr = Field(exclude=True, repr=False)
 
 
 class UserInfoRead(BaseModel):

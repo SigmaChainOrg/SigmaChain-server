@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +13,10 @@ from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     TokenRead,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
-    UserCreate,
     UserInfoUpdate,
+    UserInput,
     UserRead,
+    UserSignInInput,
 )
 from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
 from src.service_gateway.api.v1.services.user_service import UserService
@@ -38,18 +39,8 @@ auth_router_open = APIRouter(prefix="/auth", tags=["Auth"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"], dependencies=[Depends(security)])
 
 
-class OAuth2EmailRequestForm:
-    def __init__(
-        self,
-        email: str = Form(...),
-        password: str = Form(..., extra={"type": "password"}),
-    ):
-        self.email = email
-        self.password = password
-
-
 @auth_router_open.post("/signup", response_model=APIResponse[None], status_code=201)
-async def signup(user_signup: UserCreate, db: AsyncSession = Depends(get_db)):
+async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
@@ -81,23 +72,14 @@ async def signup(user_signup: UserCreate, db: AsyncSession = Depends(get_db)):
     status_code=200,
 )
 async def signin(
+    input: UserSignInInput,
     db: AsyncSession = Depends(get_db),
-    form_data: OAuth2EmailRequestForm = Depends(),
 ):
     user_service = UserService(db)
 
-    verified_response = await user_service.verify_user_password(
-        email=form_data.email,
-        password=form_data.password,
-    )
-
-    if not verified_response.ok:
-        raise AuthenticationError("Invalid email or password")
+    verified_response = await user_service.verify_user_password(input)
 
     user_schema = verified_response.data
-
-    if user_schema is None:
-        raise NotFoundError("User not found")
 
     secure_code_response, code = await user_service.create_secure_code(
         user_schema.user_id

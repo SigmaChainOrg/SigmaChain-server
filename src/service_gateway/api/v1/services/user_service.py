@@ -15,9 +15,10 @@ from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     SecureCodeValidate,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
-    UserCreate,
     UserInfoUpdate,
+    UserInput,
     UserRead,
+    UserSignInInput,
 )
 from src.service_gateway.security.authentication import (
     generate_random_code,
@@ -26,6 +27,7 @@ from src.service_gateway.security.authentication import (
 )
 from src.utils.function_responses import ResponseComplete, ResponseData
 from src.utils.http_exceptions import (
+    AuthenticationError,
     BadRequestError,
     DatabaseIntegrityError,
     EmailAlreadyExistsError,
@@ -62,7 +64,7 @@ class UserService:
 
     ## Public methods
 
-    async def create_user(self, user_signin: UserCreate) -> None:
+    async def create_user(self, user_signin: UserInput) -> None:
         hashed_password = hash_password(user_signin.password.get_secret_value())
 
         new_user = User(
@@ -129,18 +131,17 @@ class UserService:
 
     async def verify_user_password(
         self,
-        email: str,
-        password: str,
-    ) -> ResponseData[Optional[UserRead]]:
-        user = await self._get_user_by_email(email)
+        input: UserSignInInput,
+    ) -> ResponseData[UserRead]:
+        user = await self._get_user_by_email(input.email)
 
         if user is None:
-            return ResponseData(data=None, ok=False)
+            raise AuthenticationError("Invalid email or password")
 
         user_schema = UserRead.model_validate(user)
         return ResponseData(
             data=user_schema,
-            ok=verify_password(password, user.hashed_password),
+            ok=verify_password(input.password.get_secret_value(), user.hashed_password),
         )
 
     async def change_user_password(self, email: str, new_password: str) -> bool:
