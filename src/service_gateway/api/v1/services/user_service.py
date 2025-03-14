@@ -1,21 +1,24 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
+from src.database.models.access_control.enums import RoleEnum
+from src.database.models.access_control.role import UserRoles
 from src.database.models.access_control.secure_code import SecureCode
 from src.database.models.access_control.user import User, UserInfo
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
-    SecureCodeInput,
-    SecureCodeSchema,
+    SecureCodeRead,
+    SecureCodeValidate,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserInfoUpdate,
-    UserSchema,
-    UserSignUpInput,
+    UserInput,
+    UserRead,
+    UserSignInInput,
 )
 from src.service_gateway.security.authentication import (
     generate_random_code,
@@ -24,6 +27,7 @@ from src.service_gateway.security.authentication import (
 )
 from src.utils.function_responses import ResponseComplete, ResponseData
 from src.utils.http_exceptions import (
+    AuthenticationError,
     BadRequestError,
     DatabaseIntegrityError,
     EmailAlreadyExistsError,
@@ -34,11 +38,11 @@ class UserService:
     def __init__(self, db: AsyncSession) -> None:
         self.db: AsyncSession = db
 
-    ## Private methods
+    ## Friendly methods
 
-    async def __get_user_by_email(self, email: str) -> Optional[User]:
+    async def _get_user_by_email(self, email: str) -> Optional[User]:
         result = await self.db.execute(
-            select(User).filter(
+            select(User).where(
                 User.email == email,
                 User.is_active.is_(True),
             )
@@ -47,9 +51,9 @@ class UserService:
 
         return user
 
-    async def __get_user_by_id(self, user_id: UUID) -> Optional[User]:
+    async def _get_user_by_id(self, user_id: UUID) -> Optional[User]:
         result = await self.db.execute(
-            select(User).filter(
+            select(User).where(
                 User.user_id == user_id,
                 User.is_active.is_(True),
             )
@@ -60,7 +64,7 @@ class UserService:
 
     ## Public methods
 
-    async def create_user(self, user_signin: UserSignUpInput) -> None:
+    async def create_user(self, user_signin: UserInput) -> None:
         hashed_password = hash_password(user_signin.password.get_secret_value())
 
         new_user = User(
@@ -68,6 +72,12 @@ class UserService:
             hashed_password=hashed_password,
         )
         self.db.add(new_user)
+
+        await self.db.flush()
+        await self.db.refresh(new_user)
+
+        new_user_role = UserRoles(user_id=new_user.user_id, role=RoleEnum.REQUESTER)
+        self.db.add(new_user_role)
 
         try:
             await self.db.commit()
@@ -79,9 +89,9 @@ class UserService:
 
             raise DatabaseIntegrityError()
 
-    async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserSchema]:
+    async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserRead]:
         result = await self.db.execute(
-            select(User).filter(
+            select(User).where(
                 User.user_id == user_id,
                 User.is_active.is_(True),
             )
@@ -91,12 +101,12 @@ class UserService:
         if user is None:
             return None
 
-        return UserSchema.model_validate(user)
+        return UserRead.model_validate(user)
 
     async def update_user_info_data_by_user_id(
         self, user_id: UUID, user_info_data: UserInfoUpdate
-    ) -> Optional[UserSchema]:
-        user = await self.__get_user_by_id(user_id)
+    ) -> Optional[UserRead]:
+        user = await self._get_user_by_id(user_id)
 
         if user is None:
             raise BadRequestError("User not found")
@@ -113,7 +123,7 @@ class UserService:
 
         await self.db.refresh(user)
 
-        user_schema = UserSchema.model_validate(user)
+        user_schema = UserRead.model_validate(user)
 
         await self.db.commit()
 
@@ -121,22 +131,21 @@ class UserService:
 
     async def verify_user_password(
         self,
-        email: str,
-        password: str,
-    ) -> ResponseData[Optional[UserSchema]]:
-        user = await self.__get_user_by_email(email)
+        input: UserSignInInput,
+    ) -> ResponseData[UserRead]:
+        user = await self._get_user_by_email(input.email)
 
         if user is None:
-            return ResponseData(data=None, ok=False)
+            raise AuthenticationError("Invalid email or password")
 
-        user_schema = UserSchema.model_validate(user)
+        user_schema = UserRead.model_validate(user)
         return ResponseData(
             data=user_schema,
-            ok=verify_password(password, user.hashed_password),
+            ok=verify_password(input.password.get_secret_value(), user.hashed_password),
         )
 
     async def change_user_password(self, email: str, new_password: str) -> bool:
-        user = await self.__get_user_by_email(email)
+        user = await self._get_user_by_email(email)
 
         if user is None:
             return False
@@ -149,11 +158,11 @@ class UserService:
         return True
 
     async def verify_secure_code(
-        self, secure_code_input: SecureCodeInput
-    ) -> ResponseComplete[Optional[UUID]]:
+        self, secure_code_input: SecureCodeValidate
+    ) -> ResponseComplete[Optional[Tuple[UUID, List[str]]]]:
         try:
             result = await self.db.execute(
-                select(SecureCode).filter(
+                select(SecureCode).where(
                     SecureCode.secure_code_id == secure_code_input.secure_code_id,
                     SecureCode.code == secure_code_input.code,
                 )
@@ -169,14 +178,25 @@ class UserService:
                 return ResponseComplete(msg="Secure code expired", data=None, ok=False)
 
             if secure_code.has_been_used:
-                return ResponseComplete[Optional[UUID]](
+                return ResponseComplete(
                     msg="Secure code already used", data=None, ok=False
                 )
 
             secure_code.has_been_used = True
 
-            response = ResponseComplete[Optional[UUID]](
-                msg="Secure code verified", data=secure_code.user_id, ok=True
+            result_user_roles = await self.db.execute(
+                select(UserRoles).where(UserRoles.user_id == secure_code.user_id)
+            )
+
+            user_roles = result_user_roles.scalars().all()
+
+            if not user_roles:
+                raise BadRequestError("User not found")
+
+            roles = [user_role.role.value for user_role in user_roles]
+
+            response = ResponseComplete[Optional[Tuple[UUID, List[str]]]](
+                msg="Secure code verified", data=(secure_code.user_id, roles), ok=True
             )
 
             await self.db.commit()
@@ -188,7 +208,7 @@ class UserService:
 
             raise
 
-    async def create_secure_code(self, user_id: UUID) -> Tuple[SecureCodeSchema, str]:
+    async def create_secure_code(self, user_id: UUID) -> Tuple[SecureCodeRead, str]:
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
         try:
@@ -201,7 +221,7 @@ class UserService:
 
             await self.db.flush()
 
-            secure_schema = SecureCodeSchema.model_validate(secure_code)
+            secure_schema = SecureCodeRead.model_validate(secure_code)
             code = secure_code.code
 
             await self.db.commit()

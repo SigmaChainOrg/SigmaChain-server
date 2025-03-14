@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from sqlalchemy import UUID, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -31,15 +31,13 @@ class UserGroups(Base):
 
     user: Mapped["User"] = relationship(
         "User",
-        back_populates="groups",
+        overlaps="groups",
         uselist=False,
-        lazy="joined",
     )
     group: Mapped["Group"] = relationship(
         "Group",
-        back_populates="users",
+        overlaps="users",
         uselist=False,
-        lazy="joined",
     )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -54,20 +52,40 @@ class Group(Base):
     __table_args__ = {"schema": "access_control"}
 
     group_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, nullable=False
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
+        init=False,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("access_control.group.group_id"), nullable=True
+        UUID(as_uuid=True),
+        ForeignKey("access_control.group.group_id"),
+        nullable=True,
     )
 
-    users: Mapped[list["UserGroups"]] = relationship(
-        "UserGroups", back_populates="group"
+    users: Mapped[List["User"]] = relationship(
+        "User",
+        secondary="access_control.user_groups",
+        back_populates="groups",
+        overlaps="user",
+        init=False,
     )
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
+    def to_dict(
+        self,
+        with_users: bool = False,
+    ) -> Dict[str, Any]:
+        group_dict = {
             "group_id": self.group_id,
             "name": self.name,
             "parent_id": self.parent_id,
         }
+
+        if with_users:
+            group_dict["users"] = [
+                user.to_dict(with_user_info=True) for user in self.users
+            ]
+
+        return group_dict

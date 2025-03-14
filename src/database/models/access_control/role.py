@@ -3,14 +3,17 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any, Dict
 
-from sqlalchemy import UUID, Enum, ForeignKey
+from sqlalchemy import UUID, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.configuration import Base
 from src.database.models.access_control.enums import (
     OperationEnum,
+    OperationEnumSQLA,
     ResourceEnum,
+    ResourceEnumSQLA,
     RoleEnum,
+    RoleEnumSQLA,
 )
 
 if TYPE_CHECKING:
@@ -28,12 +31,17 @@ class UserRoles(Base):
         nullable=False,
     )
     role: Mapped[RoleEnum] = mapped_column(
-        Enum(RoleEnum, name="role_enum", schema="access_control"),
+        RoleEnumSQLA,
         primary_key=True,
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="roles", uselist=False)
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="roles",
+        uselist=False,
+        init=False,
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -49,20 +57,13 @@ class Policy(Base):
     policy_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         primary_key=True,
+        default=uuid.uuid4,
         nullable=False,
+        init=False,
     )
-    role: Mapped[RoleEnum] = mapped_column(
-        Enum(RoleEnum, name="role_enum", schema="access_control"),
-        nullable=False,
-    )
-    resource: Mapped[ResourceEnum] = mapped_column(
-        Enum(ResourceEnum, name="resource_enum", schema="access_control"),
-        nullable=False,
-    )
-    operation: Mapped[OperationEnum] = mapped_column(
-        Enum(OperationEnum, name="operation_enum", schema="access_control"),
-        nullable=False,
-    )
+    role: Mapped[RoleEnum] = mapped_column(RoleEnumSQLA, nullable=False)
+    resource: Mapped[ResourceEnum] = mapped_column(ResourceEnumSQLA, nullable=False)
+    operation: Mapped[OperationEnum] = mapped_column(OperationEnumSQLA, nullable=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
