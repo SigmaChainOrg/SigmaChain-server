@@ -62,3 +62,13 @@ class UnprocessableEntityError(HTTPException):
         detail: str | List[str] = "Unprocessable entity error.",
     ) -> None:
         super().__init__(status_code=422, detail=detail)
+
+
+class InternalServerError(HTTPException):
+    """Exception when an internal server error occurs."""
+
+    def __init__(
+        self,
+        detail: str | List[str] = "Internal server error.",
+    ) -> None:
+        super().__init__(status_code=500, detail=detail)

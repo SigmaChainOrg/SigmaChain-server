@@ -27,7 +27,7 @@ from src.service_gateway.security.authentication import (
     validate_password_match,
 )
 from src.utils.email_sender import send_html_email
-from src.utils.http_exceptions import BadRequestError
+from src.utils.http_exceptions import BadRequestError, InternalServerError
 from src.utils.template_loader import load_html_template
 
 security = HTTPBearer()
@@ -96,7 +96,7 @@ async def signin(
     )
 
     if not email_sent:
-        raise BadRequestError("Error sending Email")
+        raise InternalServerError("Error sending Email")
 
     return JSONResponse(
         content=APIResponse[SecureCodeRead](
