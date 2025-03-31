@@ -14,3 +14,15 @@ class APIResponse(BaseModel, Generic[T]):
 class APIErrorResponse(BaseModel):
     detail: str | List[str]
     ok: bool = False
+
+
+class Pagination(BaseModel):
+    page: int
+    size: int
+    total: int
+    pages: int
+
+
+class PaginatedData(BaseModel, Generic[T]):
+    items: List[T]
+    pagination: Pagination

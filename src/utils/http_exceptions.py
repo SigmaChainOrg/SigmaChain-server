@@ -52,3 +52,13 @@ class NotFoundError(HTTPException):
         detail: str | List[str] = "Resource not found.",
     ) -> None:
         super().__init__(status_code=404, detail=detail)
+
+
+class UnprocessableEntityError(HTTPException):
+    """Exception when an unprocessable entity error occurs."""
+
+    def __init__(
+        self,
+        detail: str | List[str] = "Unprocessable entity error.",
+    ) -> None:
+        super().__init__(status_code=422, detail=detail)

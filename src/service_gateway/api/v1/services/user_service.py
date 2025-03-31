@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Literal, Optional, Tuple
+from math import ceil
+from typing import List, Literal, Optional, Sequence, Tuple
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql import or_
 
 from src.database.models.access_control.enums import RoleEnum
 from src.database.models.access_control.role import UserRoles
@@ -16,11 +19,16 @@ from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     SecureCodeValidate,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
+    UserFilters,
     UserInfoUpdate,
     UserInput,
     UserQuery,
     UserRead,
     UserSignInInput,
+)
+from src.service_gateway.api.v1.schemas.general.general_schemas import (
+    PaginatedData,
+    Pagination,
 )
 from src.service_gateway.security.authentication import (
     generate_random_code,
@@ -32,6 +40,7 @@ from src.utils.http_exceptions import (
     DatabaseIntegrityError,
     EmailAlreadyExistsError,
     NotFoundError,
+    UnprocessableEntityError,
 )
 
 
@@ -71,6 +80,49 @@ class UserService:
         user = result.scalars().first()
 
         return user
+
+    async def _get_users(
+        self,
+        *,
+        with_groups: bool = False,
+        with_roles: bool = False,
+        only_active: bool = True,
+        only_verified: Optional[bool] = None,
+        name_like: Optional[str] = None,
+        page: Optional[int] = None,
+        page_size: Optional[int] = None,
+    ) -> Sequence[User]:
+        query = select(User).where(
+            User.is_active.is_(only_active),
+        )
+
+        if page is not None and page_size is not None:
+            offset = (page - 1) * page_size
+            query = query.offset(offset).limit(page_size)
+        elif page is not None or page_size is not None:
+            raise ValueError("Both page and page_size must be provided together.")
+
+        if only_verified is not None:
+            query = query.where(User.is_verified.is_(only_verified))
+
+        if with_groups:
+            query = query.options(selectinload(User.groups))
+
+        if with_roles:
+            query = query.options(selectinload(User.roles))
+
+        if name_like:
+            query = query.join(User.user_info).where(
+                or_(
+                    UserInfo.first_name.ilike(f"%{name_like}%"),
+                    UserInfo.last_name.ilike(f"%{name_like}%"),
+                )
+            )
+
+        result = await self.db.execute(query)
+        users = result.scalars().all()
+
+        return users
 
     ## Public methods
 
@@ -125,6 +177,55 @@ class UserService:
                 with_groups=user_query.include_groups,
             )
         )
+
+    async def get_users(
+        self,
+        filters: UserFilters,
+    ) -> PaginatedData[UserRead]:
+        total_count = await self.db.execute(select(func.count()).select_from(User))
+        total_count = total_count.scalar_one()
+
+        total_pages = ceil(total_count / filters.page_size)
+
+        if filters.page > total_pages:
+            raise UnprocessableEntityError(
+                f"Page {filters.page} exceeds the total number of pages {total_pages}."
+            )
+
+        users = await self._get_users(
+            with_groups=filters.include_groups,
+            with_roles=filters.include_roles,
+            only_active=filters.only_active,
+            only_verified=filters.only_verified,
+            name_like=filters.name,
+            page=filters.page,
+            page_size=filters.page_size,
+        )
+
+        users_schema = [
+            UserRead.model_validate(
+                user.to_dict(
+                    with_user_info=filters.include_user_info,
+                    with_roles=filters.include_roles,
+                    with_groups=filters.include_groups,
+                )
+            )
+            for user in users
+        ]
+
+        pagination = Pagination(
+            page=filters.page,
+            size=filters.page_size,
+            total=total_count,
+            pages=total_pages,
+        )
+
+        paginated_data = PaginatedData(
+            items=users_schema,
+            pagination=pagination,
+        )
+
+        return paginated_data
 
     async def update_user_info_data_by_user_id(
         self,

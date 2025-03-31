@@ -89,5 +89,8 @@ class UserQuery(BaseModel):
 
 
 class UserFilters(UserQuery):
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=10, ge=1, le=100)
     only_active: bool = True
+    only_verified: Optional[bool] = None
     name: Optional[str] = None
