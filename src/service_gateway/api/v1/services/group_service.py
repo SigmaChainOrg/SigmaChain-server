@@ -239,7 +239,7 @@ class GroupService:
 
             user_service = UserService(self.db)
 
-            user = await user_service._get_user_by_id(input.user_id)
+            user = await user_service._get_user(by="id", value=input.user_id)
 
             if user is None:
                 raise BadRequestError("User or Group not found")

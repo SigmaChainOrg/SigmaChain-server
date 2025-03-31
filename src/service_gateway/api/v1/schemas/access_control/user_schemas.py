@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from datetime import date, datetime
-from typing import Annotated, Optional
+from typing import TYPE_CHECKING, Annotated, List, Optional
 from uuid import UUID
 
 from pydantic import (
@@ -15,6 +17,11 @@ from pydantic import (
 from src.database.models.access_control.enums import IdTypeEnum
 from src.utils.serializers import serialize_datetime, serialize_uuid
 
+if TYPE_CHECKING:
+    from src.service_gateway.api.v1.schemas.access_control.group_schemas import (
+        SingleGroupRead,
+    )
+
 
 class UserInput(BaseModel):
     email: EmailStr
@@ -22,7 +29,7 @@ class UserInput(BaseModel):
     confirm_password: SecretStr = Field(exclude=True, repr=False)
 
 
-class UserSignInInput(BaseModel):  # En lugar de UserLogin
+class UserSignInInput(BaseModel):
     email: EmailStr
     password: SecretStr = Field(exclude=True, repr=False)
 
@@ -57,7 +64,9 @@ class UserRead(BaseModel):
     is_active: bool
     is_verified: bool
     created_at: datetime
-    user_info: Optional[UserInfoRead]
+    user_info: Optional[UserInfoRead] = None
+    groups: Optional[List["SingleGroupRead"]] = None
+    roles: Optional[List[str]] = None
 
     @field_serializer("user_id")
     def serialize_user_uuid(self, user_id: UUID, _info):
@@ -66,3 +75,19 @@ class UserRead(BaseModel):
     @field_serializer("created_at")
     def serialize_created_at(self, dt: datetime, _info):
         return serialize_datetime(dt)
+
+
+# Query schemas
+
+
+class UserQuery(BaseModel):
+    include_user_info: bool = False
+    include_groups: bool = False
+    include_roles: bool = False
+    # ToDo: Uncomment when policies were added to the model
+    # include_policies: bool = False
+
+
+class UserFilters(UserQuery):
+    only_active: bool = True
+    name: Optional[str] = None

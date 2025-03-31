@@ -62,7 +62,12 @@ class User(Base):
         init=False,
     )
 
-    def to_dict(self, with_user_info: bool = False) -> Dict[str, Any]:
+    def to_dict(
+        self,
+        with_user_info: bool = False,
+        with_roles: bool = False,
+        with_groups: bool = False,
+    ) -> Dict[str, Any]:
         user_dict = {
             "user_id": self.user_id,
             "email": self.email,
@@ -73,6 +78,12 @@ class User(Base):
 
         if with_user_info:
             user_dict["user_info"] = self.user_info.to_dict()
+
+        if with_roles:
+            user_dict["roles"] = [role.role.value for role in self.roles]
+
+        if with_groups:
+            user_dict["groups"] = [group.to_dict() for group in self.groups]
 
         return user_dict
 

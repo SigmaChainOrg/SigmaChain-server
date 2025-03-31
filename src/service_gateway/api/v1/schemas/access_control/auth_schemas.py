@@ -29,3 +29,12 @@ class SecureCodeRead(BaseModel):
 class SecureCodeValidate(BaseModel):
     secure_code_id: UUID
     code: str
+
+
+# ToDo: Implement the logic for the policy read schema
+# class PolocyRead(BaseModel):
+#     model_config = ConfigDict(from_attributes=True)
+
+#     role: str
+#     resource: str
+#     operation: str

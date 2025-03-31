@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from src.database.models.access_control.enums import RoleEnum
 from src.database.models.access_control.role import UserRoles
@@ -17,6 +18,7 @@ from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserInfoUpdate,
     UserInput,
+    UserQuery,
     UserRead,
     UserSignInInput,
 )
@@ -25,12 +27,11 @@ from src.service_gateway.security.authentication import (
     hash_password,
     verify_password,
 )
-from src.utils.function_responses import ResponseComplete, ResponseData
 from src.utils.http_exceptions import (
     AuthenticationError,
-    BadRequestError,
     DatabaseIntegrityError,
     EmailAlreadyExistsError,
+    NotFoundError,
 )
 
 
@@ -40,24 +41,33 @@ class UserService:
 
     ## Friendly methods
 
-    async def _get_user_by_email(self, email: str) -> Optional[User]:
-        result = await self.db.execute(
-            select(User).where(
-                User.email == email,
+    async def _get_user(
+        self,
+        *,
+        by: Literal["email", "id"],
+        value: str | UUID,
+        with_groups: bool = False,
+        with_roles: bool = False,
+    ) -> Optional[User]:
+        if by == "email":
+            query = select(User).where(
+                User.email == value,
                 User.is_active.is_(True),
             )
-        )
-        user = result.scalars().first()
-
-        return user
-
-    async def _get_user_by_id(self, user_id: UUID) -> Optional[User]:
-        result = await self.db.execute(
-            select(User).where(
-                User.user_id == user_id,
+        elif by == "id":
+            query = select(User).where(
+                User.user_id == value,
                 User.is_active.is_(True),
             )
-        )
+        else:
+            raise ValueError("Invalid 'by' parameter. Use 'email' or 'id'.")
+
+        if with_groups:
+            query = query.options(selectinload(User.groups))
+        if with_roles:
+            query = query.options(selectinload(User.roles))
+
+        result = await self.db.execute(query)
         user = result.scalars().first()
 
         return user
@@ -65,22 +75,23 @@ class UserService:
     ## Public methods
 
     async def create_user(self, user_signin: UserInput) -> None:
-        hashed_password = hash_password(user_signin.password.get_secret_value())
-
-        new_user = User(
-            email=user_signin.email,
-            hashed_password=hashed_password,
-        )
-        self.db.add(new_user)
-
-        await self.db.flush()
-        await self.db.refresh(new_user)
-
-        new_user_role = UserRoles(user_id=new_user.user_id, role=RoleEnum.REQUESTER)
-        self.db.add(new_user_role)
-
         try:
+            hashed_password = hash_password(user_signin.password.get_secret_value())
+
+            new_user = User(
+                email=user_signin.email,
+                hashed_password=hashed_password,
+            )
+            self.db.add(new_user)
+
+            await self.db.flush()
+            await self.db.refresh(new_user)
+
+            new_user_role = UserRoles(user_id=new_user.user_id, role=RoleEnum.REQUESTER)
+            self.db.add(new_user_role)
+
             await self.db.commit()
+
         except IntegrityError as e:
             await self.db.rollback()
 
@@ -89,27 +100,41 @@ class UserService:
 
             raise DatabaseIntegrityError()
 
-    async def get_user_data_by_id(self, user_id: UUID) -> Optional[UserRead]:
-        result = await self.db.execute(
-            select(User).where(
-                User.user_id == user_id,
-                User.is_active.is_(True),
+        except Exception:
+            await self.db.rollback()
+
+            raise
+
+    async def get_user_data_by_id(
+        self, user_id: UUID, user_query: UserQuery
+    ) -> UserRead:
+        user = await self._get_user(
+            by="id",
+            value=user_id,
+            with_groups=user_query.include_groups,
+            with_roles=user_query.include_roles,
+        )
+
+        if user is None:
+            raise NotFoundError("User not found")
+
+        return UserRead.model_validate(
+            user.to_dict(
+                with_user_info=user_query.include_user_info,
+                with_roles=user_query.include_roles,
+                with_groups=user_query.include_groups,
             )
         )
-        user = result.scalars().first()
-
-        if user is None:
-            return None
-
-        return UserRead.model_validate(user)
 
     async def update_user_info_data_by_user_id(
-        self, user_id: UUID, user_info_data: UserInfoUpdate
-    ) -> Optional[UserRead]:
-        user = await self._get_user_by_id(user_id)
+        self,
+        user_id: UUID,
+        user_info_data: UserInfoUpdate,
+    ) -> UserRead:
+        user = await self._get_user(by="id", value=user_id)
 
         if user is None:
-            raise BadRequestError("User not found")
+            raise NotFoundError("User not found")
 
         update_data = user_info_data.model_dump(exclude_unset=True)
         user_info = user.user_info
@@ -132,20 +157,23 @@ class UserService:
     async def verify_user_password(
         self,
         input: UserSignInInput,
-    ) -> ResponseData[UserRead]:
-        user = await self._get_user_by_email(input.email)
+    ) -> Tuple[UUID, str]:
+        user = await self._get_user(by="email", value=input.email)
 
         if user is None:
             raise AuthenticationError("Invalid email or password")
 
-        user_schema = UserRead.model_validate(user)
-        return ResponseData(
-            data=user_schema,
-            ok=verify_password(input.password.get_secret_value(), user.hashed_password),
+        password_verified = verify_password(
+            input.password.get_secret_value(), user.hashed_password
         )
 
+        if not password_verified:
+            raise AuthenticationError("Invalid email or password")
+
+        return user.user_id, user.email
+
     async def change_user_password(self, email: str, new_password: str) -> bool:
-        user = await self._get_user_by_email(email)
+        user = await self._get_user(by="email", value=email)
 
         if user is None:
             return False
@@ -159,7 +187,7 @@ class UserService:
 
     async def verify_secure_code(
         self, secure_code_input: SecureCodeValidate
-    ) -> ResponseComplete[Optional[Tuple[UUID, List[str]]]]:
+    ) -> Tuple[UUID, List[str]]:
         try:
             result = await self.db.execute(
                 select(SecureCode).where(
@@ -170,17 +198,15 @@ class UserService:
             secure_code = result.scalars().first()
 
             if secure_code is None:
-                return ResponseComplete(msg="Invalid secure code", data=None, ok=False)
+                raise AuthenticationError("Invalid secure code")
 
             if secure_code.expires_at.replace(tzinfo=timezone.utc) < datetime.now(
                 timezone.utc
             ):
-                return ResponseComplete(msg="Secure code expired", data=None, ok=False)
+                raise AuthenticationError("Secure code expired")
 
             if secure_code.has_been_used:
-                return ResponseComplete(
-                    msg="Secure code already used", data=None, ok=False
-                )
+                raise AuthenticationError("Secure code already used")
 
             secure_code.has_been_used = True
 
@@ -191,13 +217,11 @@ class UserService:
             user_roles = result_user_roles.scalars().all()
 
             if not user_roles:
-                raise BadRequestError("User not found")
+                raise NotFoundError("User not found")
 
             roles = [user_role.role.value for user_role in user_roles]
 
-            response = ResponseComplete[Optional[Tuple[UUID, List[str]]]](
-                msg="Secure code verified", data=(secure_code.user_id, roles), ok=True
-            )
+            response = (secure_code.user_id, roles)
 
             await self.db.commit()
 
