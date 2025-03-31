@@ -77,7 +77,9 @@ class User(Base):
         }
 
         if with_user_info:
-            user_dict["user_info"] = self.user_info.to_dict()
+            user_dict["user_info"] = (
+                self.user_info.to_dict() if self.user_info else None
+            )
 
         if with_roles:
             user_dict["roles"] = [role.role.value for role in self.roles]

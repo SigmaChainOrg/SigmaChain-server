@@ -126,7 +126,7 @@ class UserService:
 
     ## Public methods
 
-    async def create_user(self, user_signin: UserInput) -> None:
+    async def create_user(self, user_signin: UserInput) -> UUID:
         try:
             hashed_password = hash_password(user_signin.password.get_secret_value())
 
@@ -142,7 +142,14 @@ class UserService:
             new_user_role = UserRoles(user_id=new_user.user_id, role=RoleEnum.REQUESTER)
             self.db.add(new_user_role)
 
+            await self.db.flush()
+            await self.db.refresh(new_user)
+
+            user_id = new_user.user_id
+
             await self.db.commit()
+
+            return user_id
 
         except IntegrityError as e:
             await self.db.rollback()
@@ -311,16 +318,20 @@ class UserService:
 
             secure_code.has_been_used = True
 
-            result_user_roles = await self.db.execute(
-                select(UserRoles).where(UserRoles.user_id == secure_code.user_id)
+            user = await self._get_user(
+                by="id",
+                value=secure_code.user_id,
+                with_roles=True,
             )
 
-            user_roles = result_user_roles.scalars().all()
-
-            if not user_roles:
+            if not user:
                 raise NotFoundError("User not found")
 
-            roles = [user_role.role.value for user_role in user_roles]
+            if user.is_verified is False:
+                user.is_verified = True
+                await self.db.flush()
+
+            roles = [user_role.role.value for user_role in user.roles]
 
             response = (secure_code.user_id, roles)
 

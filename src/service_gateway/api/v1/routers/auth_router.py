@@ -1,4 +1,3 @@
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -7,6 +6,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
+from src.service_gateway.api.v1.functions.send_emails import send_secure_code_email
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     SecureCodeRead,
     SecureCodeValidate,
@@ -26,9 +26,7 @@ from src.service_gateway.security.authentication import (
     validate_password,
     validate_password_match,
 )
-from src.utils.email_sender import send_html_email
 from src.utils.http_exceptions import BadRequestError, InternalServerError
-from src.utils.template_loader import load_html_template
 
 security = HTTPBearer()
 
@@ -36,7 +34,11 @@ auth_router_open = APIRouter(prefix="/auth", tags=["Auth"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"], dependencies=[Depends(security)])
 
 
-@auth_router_open.post("/signup", response_model=APIResponse[None], status_code=201)
+@auth_router_open.post(
+    "/signup",
+    response_model=APIResponse[SecureCodeRead],
+    status_code=201,
+)
 async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
@@ -52,12 +54,23 @@ async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
 
     user_service = UserService(db)
 
-    await user_service.create_user(user_signup)
+    user_id = await user_service.create_user(user_signup)
+
+    secure_code_response, code = await user_service.create_secure_code(user_id)
+
+    email_sent = send_secure_code_email(
+        email=user_signup.email,
+        code=code,
+        code_id=secure_code_response.secure_code_id,
+    )
+
+    if not email_sent:
+        raise InternalServerError("Error sending Email")
 
     return JSONResponse(
-        content=APIResponse[None](
+        content=APIResponse[SecureCodeRead](
             msg="User signed up successfully",
-            data=None,
+            data=secure_code_response,
             ok=True,
         ).model_dump(),
     )
@@ -78,21 +91,10 @@ async def signin(
 
     secure_code_response, code = await user_service.create_secure_code(user_id)
 
-    if code is None:
-        raise BadRequestError("Secure code not created")
-
-    template_path = Path("templates/secure_code_email.html")
-
-    html = load_html_template(
-        str(template_path),
-        secure_code=code,
-        link="Link",
-    )
-
-    email_sent = send_html_email(
-        to=user_email,
-        subject="Secure code for SigmaChain",
-        html=html,
+    email_sent = send_secure_code_email(
+        email=user_email,
+        code=code,
+        code_id=secure_code_response.secure_code_id,
     )
 
     if not email_sent:

@@ -7,7 +7,7 @@ class EmailAlreadyExistsError(HTTPException):
     """Exception when the email is already registered in the database."""
 
     def __init__(self, message: str | List[str] = "Email already exists.") -> None:
-        super().__init__(status_code=400, detail=message)
+        super().__init__(status_code=409, detail=message)
 
 
 class DatabaseIntegrityError(HTTPException):
