@@ -110,7 +110,7 @@ class RequestGroups(Base):
 
     request_pattern: Mapped[RequestPattern] = relationship(
         "RequestPattern",
-        back_populates="groups",
+        overlaps="groups",
         uselist=False,
         init=False,
     )
