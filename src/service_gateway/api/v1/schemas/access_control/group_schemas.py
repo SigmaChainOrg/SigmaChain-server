@@ -20,7 +20,7 @@ class GroupBase(BaseModel):
         return serialize_uuid(group_id)
 
 
-class SingleGroupRead(GroupBase): ...
+class SimpleGroupRead(GroupBase): ...
 
 
 class GroupRead(GroupBase):

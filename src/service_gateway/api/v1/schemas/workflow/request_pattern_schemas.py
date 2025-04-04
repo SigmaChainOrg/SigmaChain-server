@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_serializer
 
 from src.service_gateway.api.v1.schemas.access_control.group_schemas import (
-    SingleGroupRead,
+    SimpleGroupRead,
 )
 from src.service_gateway.api.v1.schemas.workflow.activity_schemas import (
     ActivityInput,
@@ -27,7 +27,7 @@ class RequestPatternRead(BaseModel):
     published_at: Optional[datetime] = None
     is_active: bool
     created_at: datetime
-    groups: List[SingleGroupRead]
+    groups: List[SimpleGroupRead]
     activities: List[ActivityRead]
 
     @field_serializer("request_pattern_id")
