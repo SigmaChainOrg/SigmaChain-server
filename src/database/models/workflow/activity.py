@@ -71,15 +71,10 @@ class ActivityAssignees(Base):
     __tablename__ = "activity_assignees"
     __table_args__ = {"schema": "workflow"}
 
-    activity_assignee_id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        autoincrement=True,
-        init=False,
-    )
     activity_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("workflow.activity.activity_id"),
+        primary_key=True,
         nullable=False,
     )
     assignee_type: Mapped[AssigneeEnum] = mapped_column(
@@ -110,7 +105,6 @@ class ActivityAssignees(Base):
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "activity_assignee_id": self.activity_assignee_id,
             "activity_id": self.activity_id,
             "assignee_type": self.assignee_type.value,
             "user_id": self.user_id,
