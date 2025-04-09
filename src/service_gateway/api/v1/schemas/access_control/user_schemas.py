@@ -19,7 +19,7 @@ from src.utils.serializers import serialize_datetime, serialize_uuid
 
 if TYPE_CHECKING:
     from src.service_gateway.api.v1.schemas.access_control.group_schemas import (
-        SimpleGroupRead,
+        GroupSimpleRead,
     )
 
 
@@ -65,7 +65,7 @@ class UserRead(BaseModel):
     is_verified: bool
     created_at: datetime
     user_info: Optional[UserInfoRead] = None
-    groups: Optional[List["SimpleGroupRead"]] = None
+    groups: Optional[List["GroupSimpleRead"]] = None
     roles: Optional[List[str]] = None
 
     @field_serializer("user_id")
