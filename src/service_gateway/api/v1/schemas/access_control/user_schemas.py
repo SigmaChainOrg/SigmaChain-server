@@ -4,15 +4,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Annotated, List, Optional
 from uuid import UUID
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    EmailStr,
-    Field,
-    SecretStr,
-    constr,
-    field_serializer,
-)
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, constr, field_serializer
 
 from src.database.models.access_control.enums import IdTypeEnum
 from src.utils.serializers import serialize_datetime, serialize_uuid
@@ -21,17 +13,6 @@ if TYPE_CHECKING:
     from src.service_gateway.api.v1.schemas.access_control.group_schemas import (
         GroupSimpleRead,
     )
-
-
-class UserInput(BaseModel):
-    email: EmailStr
-    password: SecretStr = Field(exclude=True, repr=False)
-    confirm_password: SecretStr = Field(exclude=True, repr=False)
-
-
-class UserSignInInput(BaseModel):
-    email: EmailStr
-    password: SecretStr = Field(exclude=True, repr=False)
 
 
 class UserInfoRead(BaseModel):

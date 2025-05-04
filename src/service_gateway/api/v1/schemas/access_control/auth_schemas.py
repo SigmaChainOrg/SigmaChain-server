@@ -1,9 +1,20 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_serializer
 
 from src.utils.serializers import serialize_datetime, serialize_uuid
+
+
+class SignupInput(BaseModel):
+    email: EmailStr
+    password: SecretStr = Field(repr=False)
+    confirm_password: SecretStr = Field(repr=False)
+
+
+class SigninInput(BaseModel):
+    email: EmailStr
+    password: SecretStr = Field(repr=False)
 
 
 class TokenRead(BaseModel):

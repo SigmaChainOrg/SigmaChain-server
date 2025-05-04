@@ -10,14 +10,14 @@ from src.service_gateway.api.v1.functions.send_emails import send_secure_code_em
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     SecureCodeRead,
     SecureCodeValidate,
+    SigninInput,
+    SignupInput,
     TokenRead,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserInfoUpdate,
-    UserInput,
     UserQuery,
     UserRead,
-    UserSignInInput,
 )
 from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
 from src.service_gateway.api.v1.services.user_service import UserService
@@ -39,7 +39,7 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"], dependencies=[Depends(sec
     response_model=APIResponse[SecureCodeRead],
     status_code=201,
 )
-async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
+async def signup(user_signup: SignupInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
@@ -82,7 +82,7 @@ async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
     status_code=200,
 )
 async def signin(
-    input: UserSignInInput,
+    input: SigninInput,
     db: AsyncSession = Depends(get_db),
 ):
     user_service = UserService(db)

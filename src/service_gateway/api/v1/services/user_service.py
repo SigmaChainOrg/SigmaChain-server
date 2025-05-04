@@ -17,14 +17,14 @@ from src.database.models.access_control.user import User, UserInfo
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     SecureCodeRead,
     SecureCodeValidate,
+    SigninInput,
+    SignupInput,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserFilters,
     UserInfoUpdate,
-    UserInput,
     UserQuery,
     UserRead,
-    UserSignInInput,
 )
 from src.service_gateway.api.v1.schemas.general.general_schemas import (
     PaginatedData,
@@ -126,7 +126,7 @@ class UserService:
 
     ## Public methods
 
-    async def create_user(self, user_signin: UserInput) -> UUID:
+    async def create_user(self, user_signin: SignupInput) -> UUID:
         try:
             hashed_password = hash_password(user_signin.password.get_secret_value())
 
@@ -264,7 +264,7 @@ class UserService:
 
     async def verify_user_password(
         self,
-        input: UserSignInInput,
+        input: SigninInput,
     ) -> Tuple[UUID, str]:
         user = await self._get_user(by="email", value=input.email)
 
