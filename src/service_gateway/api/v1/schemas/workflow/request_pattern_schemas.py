@@ -22,12 +22,12 @@ class RequestPatternRead(BaseModel):
     label: str
     description: str
     supervisor_id: Optional[UUID] = None
-    activity_id: Optional[int] = None
+    activity_id: int
     is_published: bool
     published_at: Optional[datetime] = None
     is_active: bool
     created_at: datetime
-    groups: List[GroupSimpleRead]
+    groups: Optional[List[GroupSimpleRead]] = None
     activities: List[ActivityRead]
 
     @field_serializer("request_pattern_id")
@@ -43,7 +43,6 @@ class RequestPatternInput(BaseModel):
     label: str
     description: str
     supervisor_id: Optional[UUID] = None
-    activity_id: Optional[int] = None
     groups: List[UUID]
     activities: List[ActivityInput]
 

@@ -1,6 +1,6 @@
 import uuid
 from datetime import timedelta
-from typing import Any, Dict
+from typing import Optional
 
 from sqlalchemy import UUID, ForeignKey, Integer, Interval, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -33,6 +33,7 @@ class Activity(Base):
     )
     estimated_time: Mapped[timedelta] = mapped_column(
         Interval,
+        default=timedelta(seconds=0),
         nullable=False,
     )
     form_pattern_id: Mapped[int] = mapped_column(
@@ -48,23 +49,18 @@ class Activity(Base):
         nullable=True,
     )
 
+    assignee: Mapped["ActivityAssignees"] = relationship(
+        "ActivityAssignees",
+        back_populates="activity",
+        uselist=False,
+        init=False,
+    )
     form_pattern: Mapped[FormPattern] = relationship(
         "FormPattern",
         back_populates="activity",
         uselist=False,
         init=False,
     )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "activity_id": self.activity_id,
-            "label": self.label,
-            "description": self.description,
-            "estimated_time": self.estimated_time,
-            "form_pattern_id": self.form_pattern_id,
-            "next_activity_id": self.next_activity_id,
-            "form_pattern": self.form_pattern.to_dict() if self.form_pattern else None,
-        }
 
 
 class ActivityAssignees(Base):
@@ -81,12 +77,12 @@ class ActivityAssignees(Base):
         AssigneeEnumSQLA,
         nullable=False,
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("access_control.user.user_id"),
         nullable=True,
     )
-    group_id: Mapped[uuid.UUID] = mapped_column(
+    group_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("access_control.group.group_id"),
         nullable=True,
@@ -102,13 +98,9 @@ class ActivityAssignees(Base):
         uselist=False,
         init=False,
     )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "activity_id": self.activity_id,
-            "assignee_type": self.assignee_type.value,
-            "user_id": self.user_id,
-            "group_id": self.group_id,
-            "user": self.user.to_dict() if self.user else None,
-            "group": self.group.to_dict() if self.group else None,
-        }
+    activity: Mapped[Activity] = relationship(
+        "Activity",
+        back_populates="assignee",
+        uselist=False,
+        init=False,
+    )

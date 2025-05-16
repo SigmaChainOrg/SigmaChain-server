@@ -4,8 +4,7 @@ from decouple import UndefinedValueError, config
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
-# Ensure all models are imported
-import src.database.models  # noqa
+from src.database.extensions.model_dict_extension import ModelDictExtension
 
 try:
     user = config("DB_USER")
@@ -38,6 +37,12 @@ async_session_factory = async_sessionmaker(
 
 class Base(DeclarativeBase, MappedAsDataclass):
     """Base class for all models"""
+
+
+ModelDictExtension.register()
+
+# Ensure all models are imported
+import src.database.models  # noqa
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

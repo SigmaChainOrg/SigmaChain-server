@@ -1,13 +1,14 @@
 from datetime import timedelta
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 from src.service_gateway.api.v1.schemas.workflow.activity_asignees_schemas import (
     ActivityAsigneesInput,
     ActivityAsigneesRead,
     ActivityAsigneesUpdate,
 )
+from src.utils.serializers import serialize_timedelta
 
 
 class ActivityRead(BaseModel):
@@ -21,6 +22,10 @@ class ActivityRead(BaseModel):
     form_id: Optional[int] = None
     next_activity_id: Optional[int] = None
     estimated_time: Optional[timedelta] = None
+
+    @field_serializer("estimated_time")
+    def serialize_estimated_time(self, value: timedelta) -> float:
+        return serialize_timedelta(value)
 
 
 class ActivityInput(BaseModel):
