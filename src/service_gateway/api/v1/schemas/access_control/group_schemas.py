@@ -20,6 +20,9 @@ class GroupBase(BaseModel):
         return serialize_uuid(group_id)
 
 
+class GroupSimpleRead(GroupBase): ...
+
+
 class GroupRead(GroupBase):
     parent_id: Optional[UUID] = None
     users: Optional[List[UserRead]] = None
