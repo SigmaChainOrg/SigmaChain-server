@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -41,11 +41,3 @@ class FormPattern(Base):
         back_populates="form_pattern",
         uselist=False,
     )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "form_pattern_id": self.form_pattern_id,
-            "updated_at": self.updated_at,
-            "created_at": self.created_at,
-            "activity": self.activity.to_dict() if self.activity else None,
-        }

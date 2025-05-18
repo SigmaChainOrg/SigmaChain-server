@@ -36,13 +36,13 @@ class Activity(Base):
         default=timedelta(seconds=0),
         nullable=False,
     )
-    form_pattern_id: Mapped[int] = mapped_column(
+    form_pattern_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("workflow.form_pattern.form_pattern_id"),
         default=None,
         nullable=True,
     )
-    next_activity_id: Mapped[int] = mapped_column(
+    next_activity_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("workflow.activity.activity_id"),
         default=None,
@@ -69,7 +69,7 @@ class ActivityAssignees(Base):
 
     activity_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("workflow.activity.activity_id"),
+        ForeignKey("workflow.activity.activity_id", ondelete="CASCADE"),
         primary_key=True,
         nullable=False,
     )

@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+from pydantic import BaseModel, ConfigDict, field_serializer, model_validator
 
 from src.database.models.workflow.enums import AssigneeEnum
 from src.utils.serializers import serialize_uuid
@@ -28,8 +28,21 @@ class ActivityAsigneesInput(BaseModel):
     user_id: Optional[UUID] = None
     group_id: Optional[UUID] = None
 
-
-class ActivityAsigneesUpdate(BaseModel):
-    assignee_type: Optional[AssigneeEnum] = None
-    user_id: Optional[UUID] = None
-    group_id: Optional[UUID] = None
+    @model_validator(mode="after")
+    def check_assignments(self) -> "ActivityAsigneesInput":
+        if self.assignee_type == AssigneeEnum.REQUESTER:
+            if self.user_id is not None or self.group_id is not None:
+                raise ValueError(
+                    "If assignee_type is 'requester', both user_id and group_id must be None."
+                )
+        elif self.assignee_type == AssigneeEnum.USER:
+            if self.user_id is None:
+                raise ValueError("If assignee_type is 'user', user_id is required.")
+            if self.group_id is not None:
+                raise ValueError("If assignee_type is 'user', group_id must be None.")
+        elif self.assignee_type == AssigneeEnum.GROUP:
+            if self.group_id is None:
+                raise ValueError("If assignee_type is 'group', group_id is required.")
+            if self.user_id is not None:
+                raise ValueError("If assignee_type is 'group', user_id must be None.")
+        return self
