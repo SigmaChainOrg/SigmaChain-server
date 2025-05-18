@@ -15,11 +15,11 @@ class ActivityAsigneesRead(BaseModel):
     group_id: Optional[UUID] = None
 
     @field_serializer("user_id")
-    def serialize_user_id(self, value: UUID) -> str | None:
+    def serialize_user_id(self, value: UUID):
         return serialize_uuid(value)
 
     @field_serializer("group_id")
-    def serialize_group_id(self, value: UUID) -> str | None:
+    def serialize_group_id(self, value: UUID):
         return serialize_uuid(value)
 
 
