@@ -12,3 +12,12 @@ from src.database.models.access_control.user import (  # type: ignore # noqa
     User,
     UserInfo,
 )
+from src.database.models.workflow.activity import (  # type: ignore # noqa
+    Activity,
+    ActivityAssignees,
+)
+from src.database.models.workflow.form_pattern import FormPattern  # type: ignore # noqa
+from src.database.models.workflow.request_pattern import (  # type: ignore # noqa
+    RequestGroups,
+    RequestPattern,
+)

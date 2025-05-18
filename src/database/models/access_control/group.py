@@ -33,11 +33,13 @@ class UserGroups(Base):
         "User",
         overlaps="groups",
         uselist=False,
+        init=False,
     )
     group: Mapped["Group"] = relationship(
         "Group",
         overlaps="users",
         uselist=False,
+        init=False,
     )
 
     def to_dict(self) -> Dict[str, Any]:

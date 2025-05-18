@@ -1,4 +1,3 @@
-from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -7,16 +6,18 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
+from src.service_gateway.api.v1.functions.send_emails import send_secure_code_email
 from src.service_gateway.api.v1.schemas.access_control.auth_schemas import (
     SecureCodeRead,
     SecureCodeValidate,
+    SigninInput,
+    SignupInput,
     TokenRead,
 )
 from src.service_gateway.api.v1.schemas.access_control.user_schemas import (
     UserInfoUpdate,
-    UserInput,
+    UserQuery,
     UserRead,
-    UserSignInInput,
 )
 from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
 from src.service_gateway.api.v1.services.user_service import UserService
@@ -25,13 +26,7 @@ from src.service_gateway.security.authentication import (
     validate_password,
     validate_password_match,
 )
-from src.utils.email_sender import send_html_email
-from src.utils.http_exceptions import (
-    AuthenticationError,
-    BadRequestError,
-    NotFoundError,
-)
-from src.utils.template_loader import load_html_template
+from src.utils.http_exceptions import BadRequestError, InternalServerError
 
 security = HTTPBearer()
 
@@ -39,8 +34,12 @@ auth_router_open = APIRouter(prefix="/auth", tags=["Auth"])
 auth_router = APIRouter(prefix="/auth", tags=["Auth"], dependencies=[Depends(security)])
 
 
-@auth_router_open.post("/signup", response_model=APIResponse[None], status_code=201)
-async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
+@auth_router_open.post(
+    "/signup",
+    response_model=APIResponse[SecureCodeRead],
+    status_code=201,
+)
+async def signup(user_signup: SignupInput, db: AsyncSession = Depends(get_db)):
     pw_validity = validate_password(user_signup.password.get_secret_value())
 
     if not pw_validity.ok:
@@ -55,12 +54,23 @@ async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
 
     user_service = UserService(db)
 
-    await user_service.create_user(user_signup)
+    user_id = await user_service.create_user(user_signup)
+
+    secure_code_response, code = await user_service.create_secure_code(user_id)
+
+    email_sent = send_secure_code_email(
+        email=user_signup.email,
+        code=code,
+        code_id=secure_code_response.secure_code_id,
+    )
+
+    if not email_sent:
+        raise InternalServerError("Error sending Email")
 
     return JSONResponse(
-        content=APIResponse[None](
+        content=APIResponse[SecureCodeRead](
             msg="User signed up successfully",
-            data=None,
+            data=secure_code_response,
             ok=True,
         ).model_dump(),
     )
@@ -72,38 +82,23 @@ async def signup(user_signup: UserInput, db: AsyncSession = Depends(get_db)):
     status_code=200,
 )
 async def signin(
-    input: UserSignInInput,
+    input: SigninInput,
     db: AsyncSession = Depends(get_db),
 ):
     user_service = UserService(db)
 
-    verified_response = await user_service.verify_user_password(input)
+    user_id, user_email = await user_service.verify_user_password(input)
 
-    user_schema = verified_response.data
+    secure_code_response, code = await user_service.create_secure_code(user_id)
 
-    secure_code_response, code = await user_service.create_secure_code(
-        user_schema.user_id
-    )
-
-    if code is None:
-        raise BadRequestError("Secure code not created")
-
-    template_path = Path("templates/secure_code_email.html")
-
-    html = load_html_template(
-        str(template_path),
-        secure_code=code,
-        link="Link",
-    )
-
-    email_sent = send_html_email(
-        to=user_schema.email,
-        subject="Secure code for SigmaChain",
-        html=html,
+    email_sent = send_secure_code_email(
+        email=user_email,
+        code=code,
+        code_id=secure_code_response.secure_code_id,
     )
 
     if not email_sent:
-        raise BadRequestError("Email not sent")
+        raise InternalServerError("Error sending Email")
 
     return JSONResponse(
         content=APIResponse[SecureCodeRead](
@@ -125,20 +120,12 @@ async def validate_secure_code(
 ):
     user_service = UserService(db)
 
-    verified_response = await user_service.verify_secure_code(data)
-
-    if not verified_response.ok:
-        raise AuthenticationError(verified_response.msg)
-
-    user_id_and_roles = verified_response.data
-
-    if user_id_and_roles is None:
-        raise NotFoundError("User not found")
+    user_id, roles = await user_service.verify_secure_code(data)
 
     token = create_access_token(
         data={
-            "sub": str(user_id_and_roles[0]),
-            "roles": user_id_and_roles[1],
+            "sub": str(user_id),
+            "roles": roles,
         }
     )
 
@@ -157,14 +144,15 @@ async def validate_secure_code(
 
 
 @auth_router.get("/me", response_model=APIResponse[UserRead], status_code=200)
-async def me(request: Request, db: AsyncSession = Depends(get_db)):
+async def me(
+    request: Request,
+    query: UserQuery = Depends(),
+    db: AsyncSession = Depends(get_db),
+):
     user_service = UserService(db)
 
     user_id: UUID = request.state.user_id
-    user_data = await user_service.get_user_data_by_id(user_id)
-
-    if user_data is None:
-        raise NotFoundError("User not found")
+    user_data = await user_service.get_user_data_by_id(user_id, query)
 
     return JSONResponse(
         content=APIResponse[UserRead](
@@ -189,9 +177,6 @@ async def update_user_info(
 
     user_id: UUID = request.state.user_id
     user_data = await user_service.update_user_info_data_by_user_id(user_id, data)
-
-    if user_data is None:
-        raise NotFoundError("User not found")
 
     return JSONResponse(
         content=APIResponse[UserRead](
