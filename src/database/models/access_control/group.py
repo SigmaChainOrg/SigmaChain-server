@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import UUID, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -42,12 +42,6 @@ class UserGroups(Base):
         init=False,
     )
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "user_id": self.user_id,
-            "group_id": self.group_id,
-        }
-
 
 class Group(Base):
     __tablename__ = "group"
@@ -74,20 +68,3 @@ class Group(Base):
         overlaps="user",
         init=False,
     )
-
-    def to_dict(
-        self,
-        with_users: bool = False,
-    ) -> Dict[str, Any]:
-        group_dict = {
-            "group_id": self.group_id,
-            "name": self.name,
-            "parent_id": self.parent_id,
-        }
-
-        if with_users:
-            group_dict["users"] = [
-                user.to_dict(with_user_info=True) for user in self.users
-            ]
-
-        return group_dict
