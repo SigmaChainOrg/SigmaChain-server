@@ -16,7 +16,7 @@ tags_metadata = [
 
 app = FastAPI(openapi_tags=tags_metadata)
 app.title = "SigmaChain API"
-app.version = "0.0.2"
+app.version = "0.0.3"
 
 app.add_middleware(
     CORSMiddleware,
