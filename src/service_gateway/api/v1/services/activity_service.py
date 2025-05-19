@@ -23,7 +23,7 @@ class ActivitiesChain:
         return [
             ActivityRead.model_validate(
                 dict(
-                    **activity.__dict__,
+                    **activity.to_dict(),
                     activity_order=key,
                 )
             )

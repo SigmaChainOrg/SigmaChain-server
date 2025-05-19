@@ -34,6 +34,10 @@ class RequestPatternRead(BaseModel):
     def serialize_id(self, value: UUID):
         return serialize_uuid(value)
 
+    @field_serializer("supervisor_id")
+    def serialize_supervisor_id(self, value: Optional[UUID]):
+        return serialize_uuid(value)
+
     @field_serializer("published_at")
     def serialize_published_at(self, value: datetime):
         return serialize_datetime(value)

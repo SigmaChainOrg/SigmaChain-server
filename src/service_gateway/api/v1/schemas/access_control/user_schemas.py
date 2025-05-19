@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import TYPE_CHECKING, Annotated, List, Optional
+from typing import TYPE_CHECKING, Annotated, Any, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, constr, field_serializer
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    constr,
+    field_serializer,
+    model_validator,
+)
 
-from src.database.models.access_control.enums import IdTypeEnum
+from src.database.models.access_control.enums import IdTypeEnum, RoleEnum
 from src.utils.serializers import serialize_datetime, serialize_uuid
 
 if TYPE_CHECKING:
@@ -47,7 +55,7 @@ class UserRead(BaseModel):
     created_at: datetime
     user_info: Optional[UserInfoRead] = None
     groups: Optional[List["GroupSimpleRead"]] = None
-    roles: Optional[List[str]] = None
+    roles: Optional[List[RoleEnum]] = None
 
     @field_serializer("user_id")
     def serialize_user_uuid(self, user_id: UUID, _info):
@@ -56,6 +64,20 @@ class UserRead(BaseModel):
     @field_serializer("created_at")
     def serialize_created_at(self, dt: datetime, _info):
         return serialize_datetime(dt)
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_roles(cls, data: Any):
+        if data is None:
+            return data
+
+        if not isinstance(data, dict):
+            return data
+
+        if "roles" in data and isinstance(data["roles"], list):
+            data["roles"] = [item["role"] for item in data["roles"]]
+
+        return data
 
 
 # Query schemas
