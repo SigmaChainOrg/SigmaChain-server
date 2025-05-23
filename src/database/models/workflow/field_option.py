@@ -25,3 +25,9 @@ class FieldOption(Base):
         String,
         nullable=False,
     )
+    option_order: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        unique=True,
+        index=True,
+    )
