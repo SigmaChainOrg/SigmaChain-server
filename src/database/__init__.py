@@ -16,6 +16,8 @@ from src.database.models.workflow.activity import (  # type: ignore # noqa
     Activity,
     ActivityAssignees,
 )
+from src.database.models.workflow.field_option import FieldOption  # type: ignore # noqa
+from src.database.models.workflow.form_field import FormField  # type: ignore # noqa
 from src.database.models.workflow.form_pattern import FormPattern  # type: ignore # noqa
 from src.database.models.workflow.request_pattern import (  # type: ignore # noqa
     RequestGroups,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Integer
+from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -21,6 +21,11 @@ class FormPattern(Base):
         primary_key=True,
         autoincrement=True,
         init=False,
+    )
+    form_field_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("workflow.form_field.form_field_id", ondelete="SET NULL"),
+        nullable=False,
     )
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime,
