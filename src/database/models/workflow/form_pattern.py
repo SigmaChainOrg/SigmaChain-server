@@ -25,7 +25,7 @@ class FormPattern(Base):
     form_field_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("workflow.form_field.form_field_id", ondelete="SET NULL"),
-        nullable=False,
+        nullable=True,
     )
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime,
