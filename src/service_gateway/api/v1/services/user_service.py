@@ -7,7 +7,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.sql import or_
 
 from src.database.models.access_control.enums import RoleEnum
@@ -55,28 +55,31 @@ class UserService:
         *,
         by: Literal["email", "id"],
         value: str | UUID,
-        with_groups: bool = False,
-        with_roles: bool = False,
+        include_user_info: bool = False,
+        include_groups: bool = False,
+        include_roles: bool = False,
     ) -> Optional[User]:
         if by == "email":
-            query = select(User).where(
+            stmt = select(User).where(
                 User.email == value,
                 User.is_active.is_(True),
             )
         elif by == "id":
-            query = select(User).where(
+            stmt = select(User).where(
                 User.user_id == value,
                 User.is_active.is_(True),
             )
         else:
             raise ValueError("Invalid 'by' parameter. Use 'email' or 'id'.")
 
-        if with_groups:
-            query = query.options(selectinload(User.groups))
-        if with_roles:
-            query = query.options(selectinload(User.roles))
+        if include_user_info:
+            stmt = stmt.options(joinedload(User.user_info))
+        if include_groups:
+            stmt = stmt.options(selectinload(User.groups))
+        if include_roles:
+            stmt = stmt.options(selectinload(User.roles))
 
-        result = await self.db.execute(query)
+        result = await self.db.execute(stmt)
         user = result.scalars().first()
 
         return user
@@ -84,8 +87,9 @@ class UserService:
     async def _get_users(
         self,
         *,
-        with_groups: bool = False,
-        with_roles: bool = False,
+        include_user_info: bool = False,
+        include_groups: bool = False,
+        include_roles: bool = False,
         only_active: bool = True,
         only_verified: Optional[bool] = None,
         name_like: Optional[str] = None,
@@ -105,10 +109,13 @@ class UserService:
         if only_verified is not None:
             query = query.where(User.is_verified.is_(only_verified))
 
-        if with_groups:
+        if include_user_info:
+            query = query.options(joinedload(User.user_info))
+
+        if include_groups:
             query = query.options(selectinload(User.groups))
 
-        if with_roles:
+        if include_roles:
             query = query.options(selectinload(User.roles))
 
         if name_like:
@@ -170,20 +177,15 @@ class UserService:
         user = await self._get_user(
             by="id",
             value=user_id,
-            with_groups=user_query.include_groups,
-            with_roles=user_query.include_roles,
+            include_user_info=user_query.include_user_info,
+            include_groups=user_query.include_groups,
+            include_roles=user_query.include_roles,
         )
 
         if user is None:
             raise NotFoundError("User not found")
 
-        return UserRead.model_validate(
-            user.to_dict(
-                with_user_info=user_query.include_user_info,
-                with_roles=user_query.include_roles,
-                with_groups=user_query.include_groups,
-            )
-        )
+        return UserRead.model_validate(user.to_dict())
 
     async def get_users(
         self,
@@ -200,8 +202,9 @@ class UserService:
             )
 
         users = await self._get_users(
-            with_groups=filters.include_groups,
-            with_roles=filters.include_roles,
+            include_user_info=filters.include_user_info,
+            include_groups=filters.include_groups,
+            include_roles=filters.include_roles,
             only_active=filters.only_active,
             only_verified=filters.only_verified,
             name_like=filters.name,
@@ -209,16 +212,7 @@ class UserService:
             page_size=filters.page_size,
         )
 
-        users_schema = [
-            UserRead.model_validate(
-                user.to_dict(
-                    with_user_info=filters.include_user_info,
-                    with_roles=filters.include_roles,
-                    with_groups=filters.include_groups,
-                )
-            )
-            for user in users
-        ]
+        users_schema = [UserRead.model_validate(user.to_dict()) for user in users]
 
         pagination = Pagination(
             page=filters.page,
@@ -239,7 +233,7 @@ class UserService:
         user_id: UUID,
         user_info_data: UserInfoUpdate,
     ) -> UserRead:
-        user = await self._get_user(by="id", value=user_id)
+        user = await self._get_user(by="id", value=user_id, include_user_info=True)
 
         if user is None:
             raise NotFoundError("User not found")
@@ -256,7 +250,7 @@ class UserService:
 
         await self.db.refresh(user)
 
-        user_schema = UserRead.model_validate(user)
+        user_schema = UserRead.model_validate(user.to_dict())
 
         await self.db.commit()
 
@@ -321,7 +315,7 @@ class UserService:
             user = await self._get_user(
                 by="id",
                 value=secure_code.user_id,
-                with_roles=True,
+                include_roles=True,
             )
 
             if not user:

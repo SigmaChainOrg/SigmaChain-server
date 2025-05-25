@@ -179,7 +179,7 @@ class RequestPatternService:
                 first_activity_id=request_pattern.activity_id
             )
 
-            request_pattern_dict = request_pattern.__dict__
+            request_pattern_dict = request_pattern.to_dict()
             request_pattern_dict["activities"] = activities_chain.to_activities_read()
 
             request_pattern_read = RequestPatternRead.model_validate(
@@ -216,7 +216,7 @@ class RequestPatternService:
         else:
             activities_chain = None
 
-        request_pattern_dict = request_pattern.__dict__
+        request_pattern_dict = request_pattern.to_dict()
 
         if activities_chain is not None:
             request_pattern_dict["activities"] = activities_chain.to_activities_read()
@@ -247,7 +247,7 @@ class RequestPatternService:
                     first_activity_id=request_pattern.activity_id
                 )
 
-                request_pattern_dict = request_pattern.__dict__
+                request_pattern_dict = request_pattern.to_dict()
                 request_pattern_dict["activities"] = (
                     activities_chain.to_activities_read()
                 )
@@ -259,7 +259,7 @@ class RequestPatternService:
                 )
         else:
             request_patterns_read = [
-                RequestPatternRead.model_validate(request_pattern.__dict__)
+                RequestPatternRead.model_validate(request_pattern.to_dict())
                 for request_pattern in request_patterns
             ]
 
@@ -470,7 +470,7 @@ class RequestPatternService:
             activities_chain = await activity_service._get_activities_chain(
                 first_activity_id=request_pattern.activity_id
             )
-            request_pattern_dict = request_pattern.__dict__
+            request_pattern_dict = request_pattern.to_dict()
             request_pattern_dict["activities"] = activities_chain.to_activities_read()
 
             result = RequestPatternRead.model_validate(request_pattern_dict)

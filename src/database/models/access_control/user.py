@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import UUID, Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -46,7 +46,6 @@ class User(Base):
         "UserInfo",
         back_populates="user",
         uselist=False,
-        lazy="joined",
         init=False,
     )
     roles: Mapped[List["UserRoles"]] = relationship(
@@ -61,33 +60,6 @@ class User(Base):
         overlaps="group",
         init=False,
     )
-
-    def to_dict(
-        self,
-        with_user_info: bool = False,
-        with_roles: bool = False,
-        with_groups: bool = False,
-    ) -> Dict[str, Any]:
-        user_dict = {
-            "user_id": self.user_id,
-            "email": self.email,
-            "is_active": self.is_active,
-            "is_verified": self.is_verified,
-            "created_at": self.created_at,
-        }
-
-        if with_user_info:
-            user_dict["user_info"] = (
-                self.user_info.to_dict() if self.user_info else None
-            )
-
-        if with_roles:
-            user_dict["roles"] = [role.role.value for role in self.roles]
-
-        if with_groups:
-            user_dict["groups"] = [group.to_dict() for group in self.groups]
-
-        return user_dict
 
 
 class UserInfo(Base):
@@ -120,13 +92,3 @@ class UserInfo(Base):
         lazy="joined",
         init=False,
     )
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "user_id": self.user_id,
-            "first_name": self.first_name,
-            "last_name": self.last_name,
-            "id_type": self.id_type.value,
-            "id_number": self.id_number,
-            "birth_date": self.birth_date,
-        }

@@ -32,12 +32,3 @@ class SecureCode(Base):
         nullable=False,
     )
     has_been_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    def to_dict(self):
-        return {
-            "secure_code_id": self.secure_code_id,
-            "user_id": self.user_id,
-            "code": self.code,
-            "expires_at": self.expires_at,
-            "has_been_used": self.has_been_used,
-        }

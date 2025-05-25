@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import UUID, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -43,12 +43,6 @@ class UserRoles(Base):
         init=False,
     )
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "user_id": self.user_id,
-            "role": self.role,
-        }
-
 
 class Policy(Base):
     __tablename__ = "policy"
@@ -64,11 +58,3 @@ class Policy(Base):
     role: Mapped[RoleEnum] = mapped_column(RoleEnumSQLA, nullable=False)
     resource: Mapped[ResourceEnum] = mapped_column(ResourceEnumSQLA, nullable=False)
     operation: Mapped[OperationEnum] = mapped_column(OperationEnumSQLA, nullable=False)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "policy_id": self.policy_id,
-            "role": self.role,
-            "resource": self.resource,
-            "operation": self.operation,
-        }
