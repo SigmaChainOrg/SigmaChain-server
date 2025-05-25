@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database.configuration import get_db
 from src.service_gateway.api.v1.schemas.general.general_schemas import APIResponse
+from src.service_gateway.api.v1.schemas.workflow.form_pattern_schemas import (
+    FormPatternInput,
+    FormPatternRead,
+)
 from src.service_gateway.api.v1.schemas.workflow.request_pattern_schemas import (
     RequestPatternFilters,
     RequestPatternInput,
@@ -113,6 +117,31 @@ async def update_request_pattern(
         content=APIResponse[RequestPatternRead](
             msg="Request pattern updated successfully",
             data=request_pattern,
+            ok=True,
+        ).model_dump()
+    )
+
+
+@request_pattern_router.post(
+    "/{request_pattern_id}/activity/{activity_id}/form-pattern",
+    response_model=APIResponse[FormPatternRead],
+    status_code=200,
+)
+async def create_form_pattern_for_activity(
+    request_pattern_id: UUID,
+    activity_id: UUID,
+    input: FormPatternInput,
+    db: AsyncSession = Depends(get_db),
+):
+    request_pattern_service = RequestPatternService(db)
+    # form_pattern = await request_pattern_service.create_form_pattern(
+    #     request_pattern_id, activity_id, input
+    # )
+
+    return JSONResponse(
+        content=APIResponse[None](
+            msg="Form pattern created successfully",
+            data=None,
             ok=True,
         ).model_dump()
     )
