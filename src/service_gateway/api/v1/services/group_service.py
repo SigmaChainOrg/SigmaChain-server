@@ -1,12 +1,13 @@
-from typing import Any, Dict, List, Optional, Sequence
+from typing import List, Optional, Sequence
 from uuid import UUID
 
 from sqlalchemy import literal_column
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import aliased, joinedload, selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from src.database.models.access_control.group import Group
+from src.database.models.access_control.user import User
 from src.service_gateway.api.v1.schemas.access_control.group_schemas import (
     GroupAssignUserInput,
     GroupFilters,
@@ -33,13 +34,11 @@ class GroupHierarchy:
     def __repr__(self) -> str:
         return f"GroupHierarchy(group={self.group.name}, child_groups={len(self.child_groups)})"
 
-    def to_dict(self, with_users: bool = False) -> Dict[str, Any]:
-        return {
-            **self.group.to_dict(with_users=with_users),
-            "child_groups": [
-                group.to_dict(with_users=with_users) for group in self.child_groups
-            ],
-        }
+    def to_group_read(self) -> GroupRead:
+        return GroupRead(
+            **self.group.to_dict(),
+            child_groups=[group.to_group_read() for group in self.child_groups],
+        )
 
 
 class GroupService:
@@ -51,12 +50,12 @@ class GroupService:
     async def _get_group_by_id(
         self,
         group_id: UUID,
-        with_users: bool = False,
+        include_users: bool = False,
     ) -> Optional[Group]:
         query = select(Group).where(Group.group_id == group_id)
 
-        if with_users:
-            query = query.options(joinedload(Group.users))
+        if include_users:
+            query = query.options(selectinload(Group.users).joinedload(User.user_info))
 
         result = await self.db.execute(query)
         group = result.scalars().first()
@@ -65,13 +64,13 @@ class GroupService:
 
     async def _get_all_groups(
         self,
-        with_users: bool = False,
+        include_users: bool = False,
         name_like: Optional[str] = None,
     ) -> Sequence[Group]:
         query = select(Group)
 
-        if with_users:
-            query = query.options(selectinload(Group.users))
+        if include_users:
+            query = query.options(selectinload(Group.users).joinedload(User.user_info))
 
         if name_like:
             query = query.where(Group.name.ilike(f"%{name_like}%"))
@@ -82,7 +81,7 @@ class GroupService:
         return groups
 
     async def _get_group_with_children(
-        self, group_id: UUID, with_users: bool = False
+        self, group_id: UUID, include_users: bool = False
     ) -> Optional[GroupHierarchy]:
         """
         Recursively retrieves a group with all its children using SQLAlchemy CTE,
@@ -114,7 +113,7 @@ class GroupService:
             Group.group_id.in_(select(group_hierarchy_cte.c.group_id))
         )
 
-        if with_users:
+        if include_users:
             stmt = stmt.options(selectinload(Group.users))
 
         result = await self.db.execute(stmt)
@@ -137,7 +136,7 @@ class GroupService:
 
     async def get_groups(self, filters: GroupFilters) -> List[GroupRead]:
         groups = await self._get_all_groups(
-            with_users=filters.include_users,
+            include_users=filters.include_users,
             name_like=filters.name,
         )
 
@@ -147,9 +146,7 @@ class GroupService:
         await self.db.flush()
 
         groups_dict = {
-            group.group_id: GroupRead.model_validate(
-                group.to_dict(with_users=filters.include_users)
-            )
+            group.group_id: GroupRead.model_validate(group.to_dict())
             for group in groups
         }
 
@@ -172,21 +169,28 @@ class GroupService:
         return [group for group in groups_dict.values() if group.parent_id is None]
 
     async def get_group(self, group_id: UUID, query: GroupQuery) -> GroupRead:
+        group_read: Optional[GroupRead] = None
+
         if query.include_children:
-            group = await self._get_group_with_children(
+            group_hierarchy = await self._get_group_with_children(
                 group_id,
-                with_users=query.include_users,
+                include_users=query.include_users,
             )
+            if group_hierarchy is not None:
+                group_read = group_hierarchy.to_group_read()
+
         else:
             group = await self._get_group_by_id(
                 group_id,
-                with_users=query.include_users,
+                include_users=query.include_users,
             )
+            if group is not None:
+                group_read = GroupRead.model_validate(group.to_dict())
 
-        if group is None:
+        if group_read is None:
             raise BadRequestError("Group not found")
 
-        return GroupRead.model_validate(group.to_dict(with_users=query.include_users))
+        return group_read
 
     async def create_group(self, input: GroupInput) -> GroupRead:
         try:
@@ -232,7 +236,7 @@ class GroupService:
 
     async def assign_user_to_group(self, input: GroupAssignUserInput) -> GroupRead:
         try:
-            group = await self._get_group_by_id(input.group_id, with_users=True)
+            group = await self._get_group_by_id(input.group_id, include_users=True)
 
             if group is None:
                 raise BadRequestError("User or Group not found")
@@ -249,7 +253,7 @@ class GroupService:
             await self.db.flush()
             await self.db.refresh(group)
 
-            group_read = GroupRead.model_validate(group.to_dict(with_users=True))
+            group_read = GroupRead.model_validate(group.to_dict())
 
             await self.db.commit()
 
