@@ -129,19 +129,19 @@ async def update_request_pattern(
 )
 async def create_form_pattern_for_activity(
     request_pattern_id: UUID,
-    activity_id: UUID,
+    activity_id: int,
     input: FormPatternInput,
     db: AsyncSession = Depends(get_db),
 ):
     request_pattern_service = RequestPatternService(db)
-    # form_pattern = await request_pattern_service.create_form_pattern(
-    #     request_pattern_id, activity_id, input
-    # )
+    form_pattern = await request_pattern_service.create_form_pattern_for_activity(
+        request_pattern_id, activity_id, input
+    )
 
     return JSONResponse(
-        content=APIResponse[None](
+        content=APIResponse[FormPatternRead](
             msg="Form pattern created successfully",
-            data=None,
+            data=form_pattern,
             ok=True,
         ).model_dump()
     )

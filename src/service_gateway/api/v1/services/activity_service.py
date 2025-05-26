@@ -62,6 +62,38 @@ class ActivityService:
         self.db = db
 
     ## Friendly methods
+    async def _get_activity_from_activity_chain(
+        self,
+        first_activity_id: int,
+        target_activity_id: int,
+    ) -> Optional[Activity]:
+        if first_activity_id is None:
+            return None
+
+        activity_cte = (
+            select(Activity)
+            .where(Activity.activity_id == first_activity_id)
+            .cte(name="activity_chain", recursive=True)
+        )
+
+        cte_alias = aliased(activity_cte, name="cte_alias")
+
+        activity_cte = activity_cte.union_all(
+            select(Activity).join(
+                cte_alias, Activity.activity_id == cte_alias.c.next_activity_id
+            )
+        )
+
+        stmt = (
+            select(Activity)
+            .join(activity_cte, Activity.activity_id == activity_cte.c.activity_id)
+            .where(activity_cte.c.activity_id == target_activity_id)
+            .limit(1)
+        )
+
+        result = await self.db.execute(stmt)
+        activity = result.scalar_one_or_none()
+        return activity
 
     async def _get_activities_chain(
         self,

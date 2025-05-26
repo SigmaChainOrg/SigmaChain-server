@@ -45,4 +45,5 @@ class FormPattern(Base):
         "Activity",
         back_populates="form_pattern",
         uselist=False,
+        init=False,
     )

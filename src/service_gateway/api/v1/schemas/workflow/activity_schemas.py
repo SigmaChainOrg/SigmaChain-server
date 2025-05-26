@@ -18,7 +18,7 @@ class ActivityRead(BaseModel):
     label: str
     description: str
     assignee: Optional[ActivityAsigneesRead] = None
-    form_id: Optional[int] = None
+    form_pattern_id: Optional[int] = None
     next_activity_id: Optional[int] = None
     estimated_time: Optional[timedelta] = None
 

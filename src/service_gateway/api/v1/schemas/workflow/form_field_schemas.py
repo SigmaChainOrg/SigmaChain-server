@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic_core.core_schema import FieldValidationInfo
 
 from src.database.models.workflow.enums import InputTypeEnum
 from src.service_gateway.api.v1.schemas.workflow.field_option_schemas import (
@@ -30,8 +31,8 @@ class FormFieldInput(BaseModel):
     options: Optional[List[FieldOptionInput]] = None
 
     @field_validator("options")
-    def validate_options(cls, v, values):
-        input_type = values.get("input_type")
+    def validate_options(cls, v, info: FieldValidationInfo):
+        input_type = info.data.get("input_type")
         if input_type in (InputTypeEnum.SINGLE_CHOICE, InputTypeEnum.MULTIPLE_CHOICE):
             if not v or len(v) == 0:
                 raise ValueError("At least one option is required for choice fields.")
@@ -50,8 +51,8 @@ class FormFieldUpdate(BaseModel):
     options: Optional[List[FieldOptionInput]] = None
 
     @field_validator("options")
-    def validate_options_update(cls, v, values):
-        input_type = values.get("input_type")
+    def validate_options_update(cls, v, info: FieldValidationInfo):
+        input_type = info.data.get("input_type")
         if input_type is None:
             return v
         if input_type in (InputTypeEnum.SINGLE_CHOICE, InputTypeEnum.MULTIPLE_CHOICE):

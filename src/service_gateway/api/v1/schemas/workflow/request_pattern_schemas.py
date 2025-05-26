@@ -30,20 +30,12 @@ class RequestPatternRead(BaseModel):
     groups: Optional[List[GroupSimpleRead]] = None
     activities: Optional[List[ActivityRead]] = None
 
-    @field_serializer("request_pattern_id")
+    @field_serializer("request_pattern_id", "supervisor_id")
     def serialize_id(self, value: UUID):
         return serialize_uuid(value)
 
-    @field_serializer("supervisor_id")
-    def serialize_supervisor_id(self, value: Optional[UUID]):
-        return serialize_uuid(value)
-
-    @field_serializer("published_at")
-    def serialize_published_at(self, value: datetime):
-        return serialize_datetime(value)
-
-    @field_serializer("created_at")
-    def serialize_created_at(self, value: datetime):
+    @field_serializer("published_at", "created_at")
+    def serialize_dates(self, value: datetime):
         return serialize_datetime(value)
 
 

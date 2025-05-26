@@ -9,6 +9,10 @@ from sqlalchemy.orm import selectinload
 from src.database.models.workflow.activity import Activity, ActivityAssignees
 from src.database.models.workflow.enums import AssigneeEnum
 from src.database.models.workflow.request_pattern import RequestPattern
+from src.service_gateway.api.v1.schemas.workflow.form_pattern_schemas import (
+    FormPatternInput,
+    FormPatternRead,
+)
 from src.service_gateway.api.v1.schemas.workflow.request_pattern_schemas import (
     RequestPatternFilters,
     RequestPatternInput,
@@ -17,6 +21,7 @@ from src.service_gateway.api.v1.schemas.workflow.request_pattern_schemas import 
     RequestPatternUpdate,
 )
 from src.service_gateway.api.v1.services.activity_service import ActivityService
+from src.service_gateway.api.v1.services.form_pattern_service import FormPatternService
 from src.service_gateway.api.v1.services.group_service import GroupService
 from src.utils.http_exceptions import BadRequestError, NotFoundError
 
@@ -95,7 +100,7 @@ class RequestPatternService:
             if len(activities_input) != len(
                 set((activity.activity_order for activity in input.activities))
             ):
-                raise BadRequestError("Activity order must be unique")
+                raise BadRequestError("Activity order must have unique orders.")
 
             for i, activity_input in enumerate(activities_input):
                 if (i + 1) != activity_input.activity_order:
@@ -476,6 +481,69 @@ class RequestPatternService:
             result = RequestPatternRead.model_validate(request_pattern_dict)
             await self.db.commit()
             return result
+
+        except Exception:
+            await self.db.rollback()
+            raise
+
+    async def create_form_pattern_for_activity(
+        self,
+        request_pattern_id: UUID,
+        activity_id: int,
+        input: FormPatternInput,
+    ) -> FormPatternRead:
+        try:
+            form_pattern_service = FormPatternService(self.db)
+            activity_service = ActivityService(self.db)
+
+            request_pattern = await self._get_request_pattern_by_id(request_pattern_id)
+            if not request_pattern:
+                raise NotFoundError(
+                    f"Request pattern with id {request_pattern_id} not found"
+                )
+
+            activity = await activity_service._get_activity_from_activity_chain(
+                first_activity_id=request_pattern.activity_id,
+                target_activity_id=activity_id,
+            )
+
+            if not activity:
+                raise NotFoundError(
+                    f"Activity with id {activity_id} not found in request pattern"
+                )
+
+            await self.db.refresh(activity, attribute_names=["form_pattern"])
+
+            if activity.form_pattern:
+                raise BadRequestError(
+                    f"Activity with id {activity_id} already has a form pattern"
+                )
+
+            form_pattern = (
+                await form_pattern_service._create_form_pattern_without_commit(
+                    input=input,
+                )
+            )
+
+            activity.form_pattern = form_pattern
+
+            await self.db.flush()
+            await self.db.refresh(activity, attribute_names=["form_pattern"])
+
+            fields_chain = await form_pattern_service._get_form_fields_chain(
+                first_field_id=form_pattern.form_field_id
+            )
+
+            form_pattern_read = FormPatternRead.model_validate(
+                dict(
+                    **activity.form_pattern.to_dict(),
+                    fields=fields_chain._to_fields_read(),
+                ),
+            )
+
+            await self.db.commit()
+
+            return form_pattern_read
 
         except Exception:
             await self.db.rollback()
