@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -27,17 +28,23 @@ class FormPattern(Base):
         ForeignKey("workflow.form_field.form_field_id", ondelete="SET NULL"),
         nullable=True,
     )
-    updated_at: Mapped[DateTime] = mapped_column(
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
         init=False,
     )
-    created_at: Mapped[DateTime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
         nullable=False,
+        init=False,
+    )
+    published_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        server_default=None,
+        nullable=True,
         init=False,
     )
 
@@ -47,3 +54,7 @@ class FormPattern(Base):
         uselist=False,
         init=False,
     )
+
+    @property
+    def is_published(self) -> bool:
+        return self.published_at is not None

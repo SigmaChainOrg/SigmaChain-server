@@ -104,3 +104,19 @@ class ActivityAssignees(Base):
         uselist=False,
         init=False,
     )
+
+
+class ActivityFieldDisplay(Base):
+    __tablename__ = "activity_field_display"
+    __table_args__ = {"schema": "workflow"}
+
+    activity_id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        nullable=False,
+    )
+    form_field_id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        nullable=False,
+    )

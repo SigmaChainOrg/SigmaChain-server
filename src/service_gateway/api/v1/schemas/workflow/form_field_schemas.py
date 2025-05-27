@@ -43,7 +43,7 @@ class FormFieldInput(BaseModel):
 
 class FormFieldUpdate(BaseModel):
     form_field_id: Optional[int] = None
-    form_field_order: Optional[int] = None
+    form_field_order: int
     input_type: Optional[InputTypeEnum] = None
     title: Optional[str] = None
     description: Optional[str] = None

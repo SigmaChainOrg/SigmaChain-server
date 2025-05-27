@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 
@@ -29,5 +29,5 @@ class FormPatternInput(BaseModel):
 
 
 class FormPatternUpdate(BaseModel):
-    fields: Optional[List[FormFieldUpdate]] = None
-    fields_to_delete: Optional[List[int]] = []
+    fields: List[FormFieldUpdate] = []
+    fields_to_delete: List[int] = []

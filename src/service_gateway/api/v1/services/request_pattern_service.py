@@ -66,7 +66,10 @@ class RequestPatternService:
             stmt = stmt.where(RequestPattern.supervisor_id == supervisor_id)
 
         if is_published is not None:
-            stmt = stmt.where(RequestPattern.is_published.is_(is_published))
+            if is_published:
+                stmt = stmt.where(RequestPattern.published_at.isnot(None))
+            else:
+                stmt = stmt.where(RequestPattern.published_at.is_(None))
 
         if is_active is not None:
             stmt = stmt.where(RequestPattern.is_active.is_(is_active))
@@ -103,9 +106,9 @@ class RequestPatternService:
                 raise BadRequestError("Activity order must have unique orders.")
 
             for i, activity_input in enumerate(activities_input):
-                if (i + 1) != activity_input.activity_order:
+                if i != activity_input.activity_order:
                     raise BadRequestError(
-                        f"Activity order must be continuous. Found {activity_input.activity_order} and {i + 1}"
+                        f"Activity order must be continuous. Found {activity_input.activity_order} and {i}"
                     )
 
                 new_activity = Activity(
@@ -280,6 +283,9 @@ class RequestPatternService:
             if request_pattern is None:
                 raise BadRequestError("Request pattern not found")
 
+            if request_pattern.is_published:
+                raise BadRequestError("Cannot update a published request pattern.")
+
             update_data = update.model_dump(exclude_unset=True)
 
             # A. Update simple fields if provided
@@ -350,14 +356,18 @@ class RequestPatternService:
                             f"Activity with id {activity_id} not found"
                         )
 
+                    await self.db.delete(activity_to_delete)
+
+                await self.db.flush()
+
                 # 4. Create new activity chain
                 first_activity_id = 0
                 last_activity = None
 
                 for i, activity_update in enumerate(activities_update):
-                    if (i + 1) != activity_update.activity_order:
+                    if i != activity_update.activity_order:
                         raise BadRequestError(
-                            f"Activity order must be continuous. Found {activity_update.activity_order} and {i + 1}"
+                            f"Activity order must be continuous. Found {activity_update.activity_order} and {i}"
                         )
 
                     activity_to_order: Optional[Activity] = None
@@ -408,7 +418,9 @@ class RequestPatternService:
                             await self.db.flush()
                             await self.db.refresh(activity_on_pattern.assignee)
 
+                        activity_on_pattern.next_activity_id = None
                         activity_to_order = activity_on_pattern
+
                     else:
                         if not (activity_update.label and activity_update.description):
                             raise BadRequestError(
