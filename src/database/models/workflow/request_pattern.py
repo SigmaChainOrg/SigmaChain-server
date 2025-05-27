@@ -40,12 +40,6 @@ class RequestPattern(Base):
         ForeignKey("workflow.activity.activity_id"),
         nullable=True,
     )
-    is_published: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        init=False,
-    )
     published_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime,
         nullable=True,
@@ -74,6 +68,10 @@ class RequestPattern(Base):
         overlaps="group",
         init=False,
     )
+
+    @property
+    def is_published(self) -> bool:
+        return self.published_at is not None
 
 
 class RequestGroups(Base):
