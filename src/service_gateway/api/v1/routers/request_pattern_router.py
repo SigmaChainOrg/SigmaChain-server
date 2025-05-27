@@ -199,3 +199,24 @@ async def put_request_pattern_activity_fields(
             ok=True,
         ).model_dump()
     )
+
+
+@request_pattern_router.post(
+    "/{request_pattern_id}/publish",
+    response_model=APIResponse[None],
+    status_code=200,
+)
+async def publish_request_pattern(
+    request_pattern_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    request_pattern_service = RequestPatternService(db)
+    await request_pattern_service.publish_request_pattern(request_pattern_id)
+
+    return JSONResponse(
+        content=APIResponse[None](
+            msg="Request pattern published successfully",
+            data=None,
+            ok=True,
+        ).model_dump()
+    )

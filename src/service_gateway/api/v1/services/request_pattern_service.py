@@ -1,4 +1,5 @@
 from collections import Counter
+from datetime import datetime, timezone
 from typing import List, Optional, Sequence
 from uuid import UUID
 
@@ -11,7 +12,7 @@ from src.database.models.workflow.activity import (
     ActivityAssignees,
     ActivityFieldDisplay,
 )
-from src.database.models.workflow.enums import AssigneeEnum
+from src.database.models.workflow.enums import AssigneeEnum, InputTypeEnum
 from src.database.models.workflow.request_pattern import RequestPattern
 from src.service_gateway.api.v1.schemas.workflow.activity_fields_shemas import (
     ActivityFieldsInput,
@@ -739,3 +740,133 @@ class RequestPatternService:
         except Exception:
             await self.db.rollback()
             raise
+
+    async def publish_request_pattern(self, request_pattern_id: UUID) -> None:
+        activity_service = ActivityService(self.db)
+        form_pattern_service = FormPatternService(self.db)
+
+        request_pattern = await self._get_request_pattern_by_id(request_pattern_id)
+
+        if not request_pattern:
+            raise NotFoundError(
+                f"Request pattern with id {request_pattern_id} not found"
+            )
+
+        if request_pattern.is_published:
+            raise BadRequestError("Request pattern is already published")
+
+        activity_chain = await activity_service._get_activities_chain(
+            first_activity_id=request_pattern.activity_id
+        )
+
+        if not activity_chain:
+            raise NotFoundError(
+                f"No activities found for request pattern with id {request_pattern_id}"
+            )
+
+        datetime_now = datetime.now(timezone.utc)
+
+        try:
+            activities_read = activity_chain._to_activities_read()
+            for activity_read in activities_read:
+                assignee = activity_read.assignee
+
+                if not assignee:
+                    raise BadRequestError(
+                        f"Activity with id {activity_read.activity_id} must have a assignee"
+                    )
+                elif activity_read.activity_order == 0:
+                    if assignee.assignee_type != AssigneeEnum.REQUESTER:
+                        raise BadRequestError(
+                            f"Activity with id {activity_read.activity_id} in order 0, must have a 'requester' assignee"
+                        )
+
+                if assignee.assignee_type == AssigneeEnum.REQUESTER:
+                    if assignee.user_id or assignee.group_id:
+                        raise BadRequestError(
+                            f"Activity with id {activity_read.activity_id} assignee type is 'requester' and must not have user_id or group_id"
+                        )
+                elif assignee.assignee_type == AssigneeEnum.USER:
+                    if not assignee.user_id:
+                        raise BadRequestError(
+                            f"Activity with id {activity_read.activity_id} assignee type is 'user' and must have user_id"
+                        )
+                    if assignee.group_id:
+                        raise BadRequestError(
+                            f"Activity with id {activity_read.activity_id} assignee type is 'user' and must not have group_id"
+                        )
+                elif assignee.assignee_type == AssigneeEnum.GROUP:
+                    if not assignee.group_id:
+                        raise BadRequestError(
+                            f"Activity with id {activity_read.activity_id} assignee type is 'group' and must have group_id"
+                        )
+                    if assignee.user_id:
+                        raise BadRequestError(
+                            f"Activity with id {activity_read.activity_id} assignee type is 'group' and must not have user_id"
+                        )
+
+                if not activity_read.form_pattern_id:
+                    raise BadRequestError(
+                        f"Activity with id {activity_read.activity_id} does not have a form pattern"
+                    )
+
+                form_pattern = await form_pattern_service._get_form_pattern_by_id(
+                    form_pattern_id=activity_read.form_pattern_id
+                )
+
+                if not form_pattern:
+                    raise NotFoundError(
+                        f"Form pattern with id {activity_read.form_pattern_id} not found for activity with id {activity_read.activity_id}"
+                    )
+
+                if form_pattern.is_published:
+                    raise BadRequestError(
+                        f"Form pattern with id {activity_read.form_pattern_id} is already published for activity with id {activity_read.activity_id}"
+                    )
+
+                fields_chain = await form_pattern_service._get_form_fields_chain(
+                    first_field_id=form_pattern.form_field_id
+                )
+
+                if not fields_chain:
+                    raise NotFoundError(
+                        f"No fields found for form pattern with id {form_pattern.form_pattern_id} for activity with id {activity_read.activity_id}"
+                    )
+
+                fields_read = fields_chain._to_fields_read()
+                for field_read in fields_read:
+                    if field_read.form_field_order == 0:
+                        if field_read.input_type != InputTypeEnum.SECTION:
+                            raise BadRequestError(
+                                f"Field with id {field_read.form_field_id} in order 0 must be a section. In activity with id {activity_read.activity_id}"
+                            )
+                    elif field_read.form_field_order == 1:
+                        if field_read.input_type == InputTypeEnum.SECTION:
+                            raise BadRequestError(
+                                f"Field with id {field_read.form_field_id} in order 1 must be a other field than a section. In activity with id {activity_read.activity_id}"
+                            )
+
+                    options_length = (
+                        len(field_read.options) if field_read.options else 0
+                    )
+
+                    if field_read.input_type == InputTypeEnum.SINGLE_CHOICE:
+                        if options_length < 2:
+                            raise BadRequestError(
+                                f"Field with id {field_read.form_field_id} must have at least 2 options for single choice input type. In activity with id {activity_read.activity_id}"
+                            )
+                    elif field_read.input_type == InputTypeEnum.MULTIPLE_CHOICE:
+                        if options_length < 1:
+                            raise BadRequestError(
+                                f"Field with id {field_read.form_field_id} must have at least 1 option for multiple choice input type. In activity with id {activity_read.activity_id}"
+                            )
+
+                form_pattern.published_at = datetime_now
+
+            request_pattern.published_at = datetime_now
+
+            await self.db.commit()
+
+        except Exception:
+            await self.db.rollback()
+            raise BadRequestError("Failed to publish request pattern")
