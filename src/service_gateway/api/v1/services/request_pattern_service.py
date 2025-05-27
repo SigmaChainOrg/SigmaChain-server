@@ -6,9 +6,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
-from src.database.models.workflow.activity import Activity, ActivityAssignees
+from src.database.models.workflow.activity import (
+    Activity,
+    ActivityAssignees,
+    ActivityFieldDisplay,
+)
 from src.database.models.workflow.enums import AssigneeEnum
 from src.database.models.workflow.request_pattern import RequestPattern
+from src.service_gateway.api.v1.schemas.workflow.activity_fields_shemas import (
+    ActivityFieldsInput,
+    ActivityFieldsRead,
+    FieldDisplayRead,
+)
+from src.service_gateway.api.v1.schemas.workflow.form_field_schemas import FormFieldRead
 from src.service_gateway.api.v1.schemas.workflow.form_pattern_schemas import (
     FormPatternInput,
     FormPatternRead,
@@ -188,7 +198,7 @@ class RequestPatternService:
             )
 
             request_pattern_dict = request_pattern.to_dict()
-            request_pattern_dict["activities"] = activities_chain.to_activities_read()
+            request_pattern_dict["activities"] = activities_chain._to_activities_read()
 
             request_pattern_read = RequestPatternRead.model_validate(
                 request_pattern_dict
@@ -227,7 +237,7 @@ class RequestPatternService:
         request_pattern_dict = request_pattern.to_dict()
 
         if activities_chain is not None:
-            request_pattern_dict["activities"] = activities_chain.to_activities_read()
+            request_pattern_dict["activities"] = activities_chain._to_activities_read()
 
         request_pattern_read = RequestPatternRead.model_validate(request_pattern_dict)
 
@@ -257,7 +267,7 @@ class RequestPatternService:
 
                 request_pattern_dict = request_pattern.to_dict()
                 request_pattern_dict["activities"] = (
-                    activities_chain.to_activities_read()
+                    activities_chain._to_activities_read()
                 )
 
                 request_patterns_read.append(
@@ -329,7 +339,7 @@ class RequestPatternService:
                     a.activity_id for a in activities_update if a.activity_id
                 ]
                 changes_ids = (
-                    last_activities_chain.get_activity_ids_to_update_or_delete(
+                    last_activities_chain._get_activity_ids_to_update_or_delete(
                         activities_to_update=ids_to_update
                     )
                 )
@@ -348,7 +358,7 @@ class RequestPatternService:
 
                 # 3. Delete activities if provided
                 for activity_id in update.activities_to_delete:
-                    activity_to_delete = last_activities_chain.get_activity_by_id(
+                    activity_to_delete = last_activities_chain._get_activity_by_id(
                         activity_id
                     )
                     if not activity_to_delete:
@@ -373,7 +383,7 @@ class RequestPatternService:
                     activity_to_order: Optional[Activity] = None
 
                     if activity_update.activity_id:
-                        activity_on_pattern = last_activities_chain.get_activity_by_id(
+                        activity_on_pattern = last_activities_chain._get_activity_by_id(
                             activity_update.activity_id
                         )
 
@@ -488,7 +498,7 @@ class RequestPatternService:
                 first_activity_id=request_pattern.activity_id
             )
             request_pattern_dict = request_pattern.to_dict()
-            request_pattern_dict["activities"] = activities_chain.to_activities_read()
+            request_pattern_dict["activities"] = activities_chain._to_activities_read()
 
             result = RequestPatternRead.model_validate(request_pattern_dict)
             await self.db.commit()
@@ -556,6 +566,175 @@ class RequestPatternService:
             await self.db.commit()
 
             return form_pattern_read
+
+        except Exception:
+            await self.db.rollback()
+            raise
+
+    async def get_request_pattern_activity_fields(
+        self, request_pattern_id: UUID, activity_id: int
+    ) -> List[ActivityFieldsRead]:
+        activity_service = ActivityService(self.db)
+        form_pattern_service = FormPatternService(self.db)
+
+        request_pattern = await self._get_request_pattern_by_id(request_pattern_id)
+
+        if not request_pattern:
+            raise NotFoundError(
+                f"Request pattern with id {request_pattern_id} not found"
+            )
+
+        activities_chain = await activity_service._get_activities_chain(
+            first_activity_id=request_pattern.activity_id
+        )
+
+        if not activities_chain:
+            raise NotFoundError(
+                f"No activities found for request pattern with id {request_pattern_id}"
+            )
+
+        activity = activities_chain._get_activity_by_id(activity_id)
+
+        if not activity:
+            raise NotFoundError(
+                f"Activity with id {activity_id} not found in request pattern with id {request_pattern_id}"
+            )
+
+        await self.db.refresh(activity, attribute_names=["fields_display"])
+        actual_fields_display_ids = [
+            field_display.form_field_id for field_display in activity.fields_display
+        ]
+
+        activities_read = activities_chain._to_activities_read()
+
+        activities_fields_read = []
+
+        for activity_read in activities_read:
+            fields_read: List[FormFieldRead] = []
+
+            if activity_read.activity_id == activity.activity_id:
+                break
+
+            if activity_read.form_pattern_id:
+                form_pattern = await form_pattern_service._get_form_pattern_by_id(
+                    form_pattern_id=activity_read.form_pattern_id
+                )
+
+                if not form_pattern:
+                    raise NotFoundError(
+                        f"Form pattern with id {activity_read.form_pattern_id} not found"
+                    )
+
+                if not form_pattern.form_field_id:
+                    continue
+
+                fields_chain = await form_pattern_service._get_form_fields_chain(
+                    first_field_id=form_pattern.form_field_id
+                )
+                fields_read = fields_chain._to_fields_read()
+
+            activities_fields_read.append(
+                ActivityFieldsRead(
+                    activity_id=activity_read.activity_id,
+                    activity_order=activity_read.activity_order,
+                    label=activity_read.label,
+                    fields=[
+                        FieldDisplayRead.model_validate(
+                            dict(
+                                **field.model_dump(),
+                                selected=field.form_field_id
+                                in actual_fields_display_ids,
+                            )
+                        )
+                        for field in fields_read
+                    ],
+                )
+            )
+
+        return activities_fields_read
+
+    async def put_request_pattern_activity_fields(
+        self, request_pattern_id: UUID, activity_id: int, input: ActivityFieldsInput
+    ) -> None:
+        activity_service = ActivityService(self.db)
+        form_pattern_service = FormPatternService(self.db)
+
+        try:
+            request_pattern = await self._get_request_pattern_by_id(request_pattern_id)
+
+            if not request_pattern:
+                raise NotFoundError(
+                    f"Request pattern with id {request_pattern_id} not found"
+                )
+
+            activities_chain = await activity_service._get_activities_chain(
+                first_activity_id=request_pattern.activity_id
+            )
+
+            if not activities_chain:
+                raise NotFoundError(
+                    f"No activities found for request pattern with id {request_pattern_id}"
+                )
+
+            activity = activities_chain._get_activity_by_id(activity_id)
+
+            if not activity:
+                raise NotFoundError(
+                    f"Activity with id {activity_id} not found in request pattern with id {request_pattern_id}"
+                )
+
+            await self.db.refresh(activity, attribute_names=["fields_display"])
+
+            activity.fields_display.clear()
+
+            await self.db.flush()
+
+            activities_read = activities_chain._to_activities_read()
+
+            all_fields_ids = []
+
+            for activity_read in activities_read:
+                fields_read: List[FormFieldRead] = []
+
+                if activity_read.activity_id == activity.activity_id:
+                    break
+
+                if activity_read.form_pattern_id:
+                    form_pattern = await form_pattern_service._get_form_pattern_by_id(
+                        form_pattern_id=activity_read.form_pattern_id
+                    )
+
+                    if not form_pattern:
+                        raise NotFoundError(
+                            f"Form pattern with id {activity_read.form_pattern_id} not found"
+                        )
+
+                    if not form_pattern.form_field_id:
+                        continue
+
+                    fields_chain = await form_pattern_service._get_form_fields_chain(
+                        first_field_id=form_pattern.form_field_id
+                    )
+
+                    fields_read = fields_chain._to_fields_read()
+
+                    all_fields_ids.extend(
+                        [field.form_field_id for field in fields_read]
+                    )
+
+            for field_id in input.fields:
+                if field_id not in all_fields_ids:
+                    raise BadRequestError(
+                        f"Field with id {field_id} not found in request pattern with id {request_pattern_id}"
+                    )
+
+                activity.fields_display.append(
+                    ActivityFieldDisplay(
+                        form_field_id=field_id, activity_id=activity.activity_id
+                    )
+                )
+
+            await self.db.commit()
 
         except Exception:
             await self.db.rollback()

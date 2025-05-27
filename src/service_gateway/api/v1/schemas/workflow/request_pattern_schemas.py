@@ -23,7 +23,6 @@ class RequestPatternRead(BaseModel):
     description: str
     supervisor_id: Optional[UUID] = None
     activity_id: int
-    is_published: bool
     published_at: Optional[datetime] = None
     is_active: bool
     created_at: datetime

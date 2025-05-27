@@ -15,11 +15,11 @@ class ActivitiesChain:
     def __init__(self) -> None:
         self.activities: Dict[int, Activity] = {}
 
-    def add_activity(self, activity: Activity) -> None:
+    def _add_activity(self, activity: Activity) -> None:
         count = len(self.activities) + 1
         self.activities[count] = activity
 
-    def to_activities_read(self) -> List[ActivityRead]:
+    def _to_activities_read(self) -> List[ActivityRead]:
         return [
             ActivityRead.model_validate(
                 dict(
@@ -30,16 +30,16 @@ class ActivitiesChain:
             for key, activity in self.activities.items()
         ]
 
-    def get_activity_by_order(self, order: int) -> Optional[Activity]:
+    def _get_activity_by_order(self, order: int) -> Optional[Activity]:
         return self.activities.get(order)
 
-    def get_activity_by_id(self, activity_id: int) -> Optional[Activity]:
+    def _get_activity_by_id(self, activity_id: int) -> Optional[Activity]:
         for activity in self.activities.values():
             if activity.activity_id == activity_id:
                 return activity
         return None
 
-    def get_activity_ids_to_update_or_delete(
+    def _get_activity_ids_to_update_or_delete(
         self, activities_to_update: List[int]
     ) -> Dict[Literal["update", "delete"], List[int]]:
         activities_on_chain_to_update = []
@@ -132,6 +132,6 @@ class ActivityService:
                     activity.assignee, attribute_names=["user", "group"]
                 )
 
-            activities_chain.add_activity(activity)
+            activities_chain._add_activity(activity)
 
         return activities_chain
