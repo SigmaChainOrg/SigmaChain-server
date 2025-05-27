@@ -15,6 +15,7 @@ from src.database.models.access_control.user import (  # type: ignore # noqa
 from src.database.models.workflow.activity import (  # type: ignore # noqa
     Activity,
     ActivityAssignees,
+    ActivityFieldDisplay,
 )
 from src.database.models.workflow.field_option import FieldOption  # type: ignore # noqa
 from src.database.models.workflow.form_field import FormField  # type: ignore # noqa

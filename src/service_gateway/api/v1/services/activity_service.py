@@ -15,11 +15,11 @@ class ActivitiesChain:
     def __init__(self) -> None:
         self.activities: Dict[int, Activity] = {}
 
-    def add_activity(self, activity: Activity) -> None:
+    def _add_activity(self, activity: Activity) -> None:
         count = len(self.activities) + 1
         self.activities[count] = activity
 
-    def to_activities_read(self) -> List[ActivityRead]:
+    def _to_activities_read(self) -> List[ActivityRead]:
         return [
             ActivityRead.model_validate(
                 dict(
@@ -30,16 +30,16 @@ class ActivitiesChain:
             for key, activity in self.activities.items()
         ]
 
-    def get_activity_by_order(self, order: int) -> Optional[Activity]:
+    def _get_activity_by_order(self, order: int) -> Optional[Activity]:
         return self.activities.get(order)
 
-    def get_activity_by_id(self, activity_id: int) -> Optional[Activity]:
+    def _get_activity_by_id(self, activity_id: int) -> Optional[Activity]:
         for activity in self.activities.values():
             if activity.activity_id == activity_id:
                 return activity
         return None
 
-    def get_activity_ids_to_update_or_delete(
+    def _get_activity_ids_to_update_or_delete(
         self, activities_to_update: List[int]
     ) -> Dict[Literal["update", "delete"], List[int]]:
         activities_on_chain_to_update = []
@@ -62,6 +62,38 @@ class ActivityService:
         self.db = db
 
     ## Friendly methods
+    async def _get_activity_from_activity_chain(
+        self,
+        first_activity_id: int,
+        target_activity_id: int,
+    ) -> Optional[Activity]:
+        if first_activity_id is None:
+            return None
+
+        activity_cte = (
+            select(Activity)
+            .where(Activity.activity_id == first_activity_id)
+            .cte(name="activity_chain", recursive=True)
+        )
+
+        cte_alias = aliased(activity_cte, name="cte_alias")
+
+        activity_cte = activity_cte.union_all(
+            select(Activity).join(
+                cte_alias, Activity.activity_id == cte_alias.c.next_activity_id
+            )
+        )
+
+        stmt = (
+            select(Activity)
+            .join(activity_cte, Activity.activity_id == activity_cte.c.activity_id)
+            .where(activity_cte.c.activity_id == target_activity_id)
+            .limit(1)
+        )
+
+        result = await self.db.execute(stmt)
+        activity = result.scalar_one_or_none()
+        return activity
 
     async def _get_activities_chain(
         self,
@@ -100,6 +132,6 @@ class ActivityService:
                     activity.assignee, attribute_names=["user", "group"]
                 )
 
-            activities_chain.add_activity(activity)
+            activities_chain._add_activity(activity)
 
         return activities_chain

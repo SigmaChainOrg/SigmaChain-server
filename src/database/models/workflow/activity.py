@@ -1,6 +1,6 @@
 import uuid
 from datetime import timedelta
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import UUID, ForeignKey, Integer, Interval, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -51,14 +51,21 @@ class Activity(Base):
 
     assignee: Mapped["ActivityAssignees"] = relationship(
         "ActivityAssignees",
+        foreign_keys="ActivityAssignees.activity_id",
         back_populates="activity",
         uselist=False,
         init=False,
     )
     form_pattern: Mapped[FormPattern] = relationship(
         "FormPattern",
+        foreign_keys="Activity.form_pattern_id",
         back_populates="activity",
         uselist=False,
+        init=False,
+    )
+    fields_display: Mapped[List["ActivityFieldDisplay"]] = relationship(
+        "ActivityFieldDisplay",
+        foreign_keys="ActivityFieldDisplay.activity_id",
         init=False,
     )
 
@@ -90,17 +97,38 @@ class ActivityAssignees(Base):
 
     user: Mapped[User] = relationship(
         "User",
+        foreign_keys="ActivityAssignees.user_id",
         uselist=False,
         init=False,
     )
     group: Mapped[Group] = relationship(
         "Group",
+        foreign_keys="ActivityAssignees.group_id",
         uselist=False,
         init=False,
     )
     activity: Mapped[Activity] = relationship(
         "Activity",
+        foreign_keys="ActivityAssignees.activity_id",
         back_populates="assignee",
         uselist=False,
         init=False,
+    )
+
+
+class ActivityFieldDisplay(Base):
+    __tablename__ = "activity_field_display"
+    __table_args__ = {"schema": "workflow"}
+
+    activity_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("workflow.activity.activity_id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    form_field_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("workflow.form_field.form_field_id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
     )
