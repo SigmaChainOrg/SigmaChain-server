@@ -19,6 +19,8 @@ python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 resend = "^2.6.0"
 poetry-plugin-export = "^1.9.0"
 isodate = "^0.7.2"
+gunicorn = "^23.0.0"
+uvicorn = {extras = ["standard"], version = "^0.35.0"}
 
 
 [build-system]
