@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
 from src.service_gateway.api.v1.app import api_v1
 
@@ -28,6 +29,11 @@ app.add_middleware(
 
 # Mounting app versions
 app.mount("/api/v1", app=api_v1, name="v1")
+
+
+@app.head("/", include_in_schema=False)
+async def head_index():
+    return Response(status_code=200)
 
 
 @app.get("/", tags=["Index"], include_in_schema=False)
